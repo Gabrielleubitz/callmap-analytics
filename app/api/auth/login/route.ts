@@ -45,8 +45,12 @@ export async function POST(request: NextRequest) {
 
     if (!adminAuth) {
       console.error('[Login] Firebase Admin Auth not initialized')
+      console.error('[Login] This usually means FIREBASE_SERVICE_ACCOUNT_KEY is not set in Vercel environment variables')
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { 
+          error: 'Server configuration error',
+          details: 'Firebase Admin SDK is not properly configured. Please check server logs.'
+        },
         { status: 500 }
       )
     }
