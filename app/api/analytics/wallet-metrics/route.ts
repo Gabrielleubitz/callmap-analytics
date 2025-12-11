@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import { dateRangeSchema } from '@/lib/schemas'
 import { metricResponse, errorResponse, validationError } from '@/lib/utils/api-response'
-import { z } from 'zod'
+import { toFirestoreTimestamp } from '@/lib/utils/date'
 
 /**
  * GET /api/analytics/wallet-metrics
@@ -20,22 +20,28 @@ import { z } from 'zod'
 export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
-      return NextResponse.json(errorResponse('Firebase Admin not initialized'), { status: 500 })
+      return errorResponse('Firebase Admin not initialized', 500)
     }
 
     const body = await request.json()
-    const dateRangeResult = dateRangeSchema.safeParse(body)
+    
+    // Support both dateFrom/dateTo and start/end formats
+    const dateRangeInput = body.dateFrom && body.dateTo
+      ? { start: body.dateFrom, end: body.dateTo }
+      : body
+    
+    const dateRangeResult = dateRangeSchema.safeParse(dateRangeInput)
 
     if (!dateRangeResult.success) {
-      return NextResponse.json(validationError(dateRangeResult.error), { status: 400 })
+      return validationError(dateRangeResult.error)
     }
 
     const { start: dateFrom, end: dateTo } = dateRangeResult.data
     const threshold = body.threshold ?? 1000 // Default threshold: 1000 tokens
 
     // Convert dates to Firestore timestamps
-    const startTimestamp = adminDb.Timestamp.fromDate(dateFrom)
-    const endTimestamp = adminDb.Timestamp.fromDate(dateTo)
+    const startTimestamp = toFirestoreTimestamp(dateFrom)
+    const endTimestamp = toFirestoreTimestamp(dateTo)
 
     // Query wallet transactions from analyticsEvents
     const analyticsQuery = adminDb
@@ -116,7 +122,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[analytics/wallet-metrics] Error:', error)
-    return NextResponse.json(errorResponse(error.message || 'Internal server error'), { status: 500 })
+    const errorMessage = error?.message || error?.toString() || 'Internal server error'
+    return errorResponse(errorMessage, 500, { name: error?.name, code: error?.code })
   }
 }
 

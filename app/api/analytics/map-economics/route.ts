@@ -22,7 +22,7 @@ import type { TeamEconomics } from '@/lib/utils/economics'
 export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
-      return NextResponse.json(errorResponse('Database not initialized'), { status: 500 })
+      return errorResponse('Database not initialized', 500)
     }
 
     const body = await request.json()
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!dateRangeResult.success) {
-      return NextResponse.json(validationError(dateRangeResult.error), { status: 400 })
+      return validationError(dateRangeResult.error)
     }
 
     const dateRange: DateRange = {
@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[analytics/map-economics] Error:', error)
-    return NextResponse.json(errorResponse(error.message || 'Internal server error'), { status: 500 })
+    const errorMessage = error?.message || error?.toString() || 'Internal server error'
+    return errorResponse(errorMessage, 500, { name: error?.name, code: error?.code })
   }
 }
 

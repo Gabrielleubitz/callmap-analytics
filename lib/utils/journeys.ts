@@ -93,6 +93,26 @@ export async function buildUserJourney(
         }
         break
 
+      case 'mindmap_generation':
+        if (data.success === false) {
+          events.push({
+            id: doc.id,
+            type: 'error',
+            timestamp,
+            description: `Mindmap generation failed${data.errorMessage ? `: ${data.errorMessage}` : ''}`,
+            metadata: { mindmapId: data.mindmapId, documentId: data.documentId },
+          })
+        } else {
+          events.push({
+            id: doc.id,
+            type: 'generate',
+            timestamp,
+            description: `Generated mindmap`,
+            metadata: { mindmapId: data.mindmapId },
+          })
+        }
+        break
+
       case 'file_conversion':
         if (!data.success) {
           events.push({
@@ -127,10 +147,35 @@ export async function buildUserJourney(
           })
         }
         break
+
+      case 'error':
+        events.push({
+          id: doc.id,
+          type: 'error',
+          timestamp,
+          description: `${data.errorType || 'Error'}: ${data.errorMessage || 'Unknown error'}`,
+          metadata: { errorType: data.errorType, ...(data.metadata || {}) },
+        })
+        break
+
+      case 'subscription':
+        events.push({
+          id: doc.id,
+          type: 'upgrade',
+          timestamp,
+          description: `Upgraded to ${data.plan || 'pro'} plan${data.amount ? ` ($${data.amount.toFixed(2)} ${data.currency?.toUpperCase() || 'USD'})` : ''}`,
+          metadata: { 
+            plan: data.plan, 
+            subscriptionId: data.subscriptionId,
+            amount: data.amount,
+            currency: data.currency,
+          },
+        })
+        break
     }
   })
 
-  // Get subscription/upgrade events
+  // Get subscription/upgrade events from subscriptions collection (fallback)
   try {
     const subscriptions = await adminDb!
       .collection(FIRESTORE_COLLECTIONS.subscriptions)
@@ -143,21 +188,25 @@ export async function buildUserJourney(
       const sub = doc.data()
       const timestamp = sub.createdAt?.toDate?.() || new Date(sub.createdAt)
       
-      events.push({
-        id: doc.id,
-        type: 'upgrade',
-        timestamp,
-        description: `Upgraded to ${sub.plan || 'pro'} plan`,
-        metadata: { plan: sub.plan },
-      })
+      // Only add if not already in events (from analyticsEvents)
+      const exists = events.some(e => e.id === doc.id)
+      if (!exists) {
+        events.push({
+          id: doc.id,
+          type: 'upgrade',
+          timestamp,
+          description: `Upgraded to ${sub.plan || 'pro'} plan`,
+          metadata: { plan: sub.plan },
+        })
+      }
     })
   } catch (error) {
     // Subscriptions might not exist or have different structure
     console.warn('[journeys] Could not fetch subscriptions:', error)
   }
 
-  // Sort by timestamp
-  events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  // Sort by timestamp descending (most recent first)
+  events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 
   return events
 }
@@ -220,6 +269,26 @@ export async function buildTeamJourney(
         })
         break
 
+      case 'mindmap_generation':
+        if (data.success === false) {
+          events.push({
+            id: doc.id,
+            type: 'error',
+            timestamp,
+            description: `Team mindmap generation failed${data.errorMessage ? `: ${data.errorMessage}` : ''}`,
+            metadata: { mindmapId: data.mindmapId, userId: data.userId },
+          })
+        } else {
+          events.push({
+            id: doc.id,
+            type: 'generate',
+            timestamp,
+            description: `Team generated mindmap`,
+            metadata: { mindmapId: data.mindmapId, userId: data.userId },
+          })
+        }
+        break
+
       case 'collaboration':
         events.push({
           id: doc.id,
@@ -227,6 +296,16 @@ export async function buildTeamJourney(
           timestamp,
           description: `Team collaboration: ${data.activityType?.replace(/_/g, ' ') || 'activity'}`,
           metadata: { mindmapId: data.mindmapId, userId: data.userId, activityType: data.activityType },
+        })
+        break
+
+      case 'error':
+        events.push({
+          id: doc.id,
+          type: 'error',
+          timestamp,
+          description: `Team error: ${data.errorType || 'Error'}: ${data.errorMessage || 'Unknown error'}`,
+          metadata: { errorType: data.errorType, userId: data.userId, ...(data.metadata || {}) },
         })
         break
     }
@@ -257,8 +336,8 @@ export async function buildTeamJourney(
     console.warn('[journeys] Could not fetch team subscriptions:', error)
   }
 
-  // Sort by timestamp
-  events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  // Sort by timestamp descending (most recent first)
+  events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 
   return events
 }

@@ -6,7 +6,8 @@
       "https://engine.callmap.ai",
       "https://*.vercel.app",
       "http://localhost:3000",
-      "http://localhost:3001"
+      "http://localhost:3001",
+      "http://localhost:3003"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"],
     "responseHeader": [

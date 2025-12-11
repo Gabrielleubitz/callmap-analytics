@@ -412,22 +412,22 @@ export default function UsagePage() {
               <div className="space-y-6">
                 {/* Summary Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <MetricGroupCard
+                  <HeroMetricCard
                     title="Total Credits"
                     value={formatNumber(walletMetrics.data.totals.credits)}
                     icon={<ArrowUpCircle className="h-4 w-4 text-green-600" />}
                   />
-                  <MetricGroupCard
+                  <HeroMetricCard
                     title="Total Debits"
                     value={formatNumber(walletMetrics.data.totals.debits)}
                     icon={<ArrowDownCircle className="h-4 w-4 text-red-600" />}
                   />
-                  <MetricGroupCard
+                  <HeroMetricCard
                     title="Net Movement"
                     value={formatNumber(walletMetrics.data.totals.net)}
                     icon={<Activity className="h-4 w-4" />}
                   />
-                  <MetricGroupCard
+                  <HeroMetricCard
                     title="Active Wallets"
                     value={formatNumber(walletMetrics.data.activeWallets)}
                     icon={<Wallet className="h-4 w-4" />}

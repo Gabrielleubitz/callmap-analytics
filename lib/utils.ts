@@ -16,8 +16,26 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value)
 }
 
-export function formatDate(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '-'
+  
+  let d: Date
+  if (typeof date === 'string') {
+    d = new Date(date)
+  } else if (date instanceof Date) {
+    d = date
+  } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+    // Firestore Timestamp
+    d = date.toDate()
+  } else {
+    return '-'
+  }
+  
+  // Check if date is valid
+  if (isNaN(d.getTime())) {
+    return '-'
+  }
+  
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
@@ -25,8 +43,26 @@ export function formatDate(date: Date | string): string {
   }).format(d)
 }
 
-export function formatDateTime(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '-'
+  
+  let d: Date
+  if (typeof date === 'string') {
+    d = new Date(date)
+  } else if (date instanceof Date) {
+    d = date
+  } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+    // Firestore Timestamp
+    d = date.toDate()
+  } else {
+    return '-'
+  }
+  
+  // Check if date is valid
+  if (isNaN(d.getTime())) {
+    return '-'
+  }
+  
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',

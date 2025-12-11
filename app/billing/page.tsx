@@ -142,7 +142,7 @@ export default function BillingPage() {
               },
               {
                 label: "Active Subscriptions",
-                value: subscriptions.data?.filter((s: any) => s.status === "active").length?.toString() || "0",
+                value: subscriptions.data?.data?.filter((s: any) => s.status === "active").length?.toString() || "0",
               },
               {
                 label: "Canceled This Month",
@@ -261,7 +261,7 @@ export default function BillingPage() {
                 title="Failed to load subscriptions"
                 description={subscriptions.error?.message}
               />
-            ) : !subscriptions.data || subscriptions.data.length === 0 ? (
+            ) : !subscriptions.data?.data || subscriptions.data.data.length === 0 ? (
               <EmptyState
                 title="No subscriptions"
                 description="No subscriptions found."
@@ -279,7 +279,7 @@ export default function BillingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {subscriptions.data.map((sub: any) => (
+                    {subscriptions.data.data.map((sub: any) => (
                       <tr key={sub.id} className="border-b hover:bg-gray-50">
                         <td className="py-2 px-2">
                           <Link
@@ -323,7 +323,7 @@ export default function BillingPage() {
                 title="Failed to load invoices"
                 description={invoices.error?.message}
               />
-            ) : !invoices.data || invoices.data.length === 0 ? (
+            ) : !invoices.data?.data || invoices.data.data.length === 0 ? (
               <EmptyState
                 title="No invoices"
                 description="No invoices found."
@@ -341,7 +341,7 @@ export default function BillingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.data.map((inv: any) => (
+                    {invoices.data.data.map((inv: any) => (
                       <tr key={inv.id} className="border-b hover:bg-gray-50">
                         <td className="py-2 px-2">
                           <Link
@@ -381,7 +381,7 @@ export default function BillingPage() {
                 title="Failed to load payments"
                 description={payments.error?.message}
               />
-            ) : !payments.data || payments.data.length === 0 ? (
+            ) : !payments.data?.data || payments.data.data.length === 0 ? (
               <EmptyState
                 title="No payments"
                 description="No payments found."
@@ -398,7 +398,7 @@ export default function BillingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {payments.data.map((payment: any) => (
+                    {payments.data.data.map((payment: any) => (
                       <tr key={payment.id} className="border-b hover:bg-gray-50">
                         <td className="py-2 px-2">
                           <Link
@@ -435,7 +435,7 @@ export default function BillingPage() {
                 title="Failed to load credits"
                 description={credits.error?.message}
               />
-            ) : !credits.data || credits.data.length === 0 ? (
+            ) : !credits.data?.data || credits.data.data.length === 0 ? (
               <EmptyState
                 title="No credits"
                 description="No credits found."
@@ -453,7 +453,7 @@ export default function BillingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {credits.data.map((credit: any) => (
+                    {credits.data.data.map((credit: any) => (
                       <tr key={credit.id} className="border-b hover:bg-gray-50">
                         <td className="py-2 px-2">
                           <Link

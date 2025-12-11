@@ -40,8 +40,8 @@ export async function POST(
     }
 
     // Create adjustment transaction atomically
-    const result = await adminDb.runTransaction(async (transaction) => {
-      const userRef = adminDb.collection('users').doc(userId)
+    const result = await adminDb!.runTransaction(async (transaction) => {
+      const userRef = adminDb!.collection('users').doc(userId)
       const userSnap = await transaction.get(userRef)
 
       if (!userSnap.exists) {
@@ -89,7 +89,7 @@ export async function POST(
     })
 
     // Log analytics event (non-blocking, outside transaction)
-    const analyticsRef = adminDb.collection('analyticsEvents').doc()
+    const analyticsRef = adminDb!.collection('analyticsEvents').doc()
     analyticsRef.set({
       eventType: 'wallet_tx',
       userId,

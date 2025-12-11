@@ -38,9 +38,27 @@ export default function UserDetailPage() {
   const [adjustAmount, setAdjustAmount] = useState("")
   const [adjustNote, setAdjustNote] = useState("")
   const [isAdjusting, setIsAdjusting] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isGrantingAccess, setIsGrantingAccess] = useState(false)
+  const [userIsAdmin, setUserIsAdmin] = useState(false)
 
   useEffect(() => {
     async function load() {
+      // Check if current user is superAdmin and get target user admin status
+      try {
+        const response = await fetch('/api/admin/users')
+        if (response.ok) {
+          setIsSuperAdmin(true)
+          const data = await response.json()
+          const targetUser = data.users?.find((u: any) => u.uid === userId)
+          if (targetUser) {
+            setUserIsAdmin(targetUser.isAdmin || false)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error)
+      }
+
       const [u, s, al, ff] = await Promise.all([
         getUserDetail(userId),
         getUserSessions(userId, { page: 1, pageSize: 100 }),
@@ -155,7 +173,7 @@ export default function UserDetailPage() {
                   <Badge variant="outline">{displayUser.role}</Badge>
                   <Badge variant={displayUser.status === "active" ? "default" : "secondary"}>
                     {displayUser.status}
-                  </Badge>
+              </Badge>
                 </>
               )}
             </div>
@@ -181,8 +199,8 @@ export default function UserDetailPage() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>User Data</CardTitle>
-        </CardHeader>
-        <CardContent>
+          </CardHeader>
+          <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Email</label>
@@ -341,6 +359,82 @@ export default function UserDetailPage() {
               )}
             </div>
 
+            {/* Admin Access Section */}
+            {isSuperAdmin && (
+              <div className="col-span-full border-t pt-4 mt-4">
+                <label className="text-sm font-medium text-gray-600 mb-2 block">Analytics Access</label>
+                {userIsAdmin ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default" className="bg-purple-600">
+                      ✓ Has Analytics Access
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        if (!confirm('Revoke analytics access for this user?')) return
+                        try {
+                          const response = await fetch('/api/admin/revoke-access', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ uid: userId }),
+                          })
+                          if (response.ok) {
+                            setUserIsAdmin(false)
+                            alert('Analytics access revoked. User will be logged out on next request.')
+                          } else {
+                            const error = await response.json()
+                            alert(`Failed to revoke access: ${error.error}`)
+                          }
+                        } catch (error) {
+                          console.error('Error revoking access:', error)
+                          alert('Failed to revoke access')
+                        }
+                      }}
+                    >
+                      Revoke Access
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Button
+                      variant="default"
+                      className="bg-gray-900 hover:bg-gray-800 text-white"
+                      onClick={async () => {
+                        if (!confirm('Grant analytics access to this user? They will need to set up MFA on first login.')) return
+                        setIsGrantingAccess(true)
+                        try {
+                          const response = await fetch('/api/admin/set-role', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ uid: userId, role: 'admin' }),
+                          })
+                          if (response.ok) {
+                            setUserIsAdmin(true)
+                            alert('✓ Analytics access granted! User can now log in to the analytics dashboard.')
+                          } else {
+                            const error = await response.json()
+                            alert(`Failed to grant access: ${error.error}`)
+                          }
+                        } catch (error) {
+                          console.error('Error granting access:', error)
+                          alert('Failed to grant access')
+                        } finally {
+                          setIsGrantingAccess(false)
+                        }
+                      }}
+                      disabled={isGrantingAccess}
+                    >
+                      {isGrantingAccess ? 'Granting Access...' : '🌑 Turn to the Dark Side'}
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Grant this user access to the analytics dashboard. They will need to set up MFA on first login.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium text-gray-600">Created At</label>
               <div className="mt-1 text-lg">{formatDate(displayUser.created_at)}</div>
@@ -359,9 +453,9 @@ export default function UserDetailPage() {
                 {displayUser.updatedAt ? formatDate(displayUser.updatedAt) : '-'}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* Wallet Panel */}
       <Card className="mb-6">
@@ -372,7 +466,7 @@ export default function UserDetailPage() {
           <div className="space-y-4">
             {/* Current Balance */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
+            <div>
                 <p className="text-sm text-gray-600">Current Balance</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {formatNumber(user?.tokenBalance || 0)} tokens
@@ -485,7 +579,7 @@ export default function UserDetailPage() {
                         <TableCell className="text-sm text-gray-600">{tx.source}</TableCell>
                         <TableCell className="font-medium">{formatNumber(tx.balanceAfter)}</TableCell>
                         <TableCell className="text-sm text-gray-600">
-                          {formatDate(tx.createdAt?.toDate?.() || tx.createdAt)}
+                          {formatDate(tx.createdAt)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -523,24 +617,24 @@ export default function UserDetailPage() {
                 </TableRow>
               ) : (
                 sessions.map((session) => (
-                  <TableRow key={session.id}>
-                    <TableCell className="font-mono text-xs">{session.id.slice(0, 8)}</TableCell>
-                    <TableCell>{session.source_type}</TableCell>
-                    <TableCell>
-                      <Badge variant={session.status === "ready" ? "default" : "secondary"}>
-                        {session.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {session.tokens_in && session.tokens_out
-                        ? formatNumber((session.tokens_in || 0) + (session.tokens_out || 0))
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {session.cost_usd ? formatCurrency(session.cost_usd) : "-"}
-                    </TableCell>
-                    <TableCell>{formatDate(session.created_at)}</TableCell>
-                  </TableRow>
+                <TableRow key={session.id}>
+                  <TableCell className="font-mono text-xs">{session.id.slice(0, 8)}</TableCell>
+                  <TableCell>{session.source_type}</TableCell>
+                  <TableCell>
+                    <Badge variant={session.status === "ready" ? "default" : "secondary"}>
+                      {session.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {session.tokens_in && session.tokens_out
+                      ? formatNumber((session.tokens_in || 0) + (session.tokens_out || 0))
+                      : "-"}
+                  </TableCell>
+                  <TableCell>
+                    {session.cost_usd ? formatCurrency(session.cost_usd) : "-"}
+                  </TableCell>
+                  <TableCell>{formatDate(session.created_at)}</TableCell>
+                </TableRow>
                 ))
               )}
             </TableBody>
@@ -592,13 +686,13 @@ export default function UserDetailPage() {
                 </TableRow>
               ) : (
                 auditLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="font-medium">{log.action}</TableCell>
-                    <TableCell>
-                      {log.entity_type} {log.entity_id ? `#${log.entity_id.slice(0, 8)}` : ""}
-                    </TableCell>
-                    <TableCell>{formatDate(log.created_at)}</TableCell>
-                  </TableRow>
+                <TableRow key={log.id}>
+                  <TableCell className="font-medium">{log.action}</TableCell>
+                  <TableCell>
+                    {log.entity_type} {log.entity_id ? `#${log.entity_id.slice(0, 8)}` : ""}
+                  </TableCell>
+                  <TableCell>{formatDate(log.created_at)}</TableCell>
+                </TableRow>
                 ))
               )}
             </TableBody>

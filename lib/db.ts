@@ -33,12 +33,19 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
     })
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error(`[API] ${endpoint} failed:`, errorData)
+      const errorText = await response.text().catch(() => 'Unable to read error')
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
+      console.error(`[API] ${endpoint} failed (${response.status}):`, errorData)
       return null
     }
     
-    return await response.json()
+    const json = await response.json()
+    return json
   } catch (error) {
     console.error(`[API] ${endpoint} error:`, error)
     return null
@@ -946,6 +953,42 @@ export async function getAnalyticsAlerts(): Promise<{
 }
 
 // Journey Explorer
+
+export interface UserSearchResult {
+  id: string
+  email: string
+  name?: string
+  firstName?: string
+  lastName?: string
+}
+
+export async function searchUsers(query: string, limit = 10): Promise<UserSearchResult[]> {
+  try {
+    console.log('[searchUsers] Calling API with query:', query)
+    const result = await apiRequest<PaginatedResponse<UserSearchResult>>(
+      '/api/users/search',
+      {
+        method: 'POST',
+        body: JSON.stringify({ query, limit }),
+      }
+    )
+    console.log('[searchUsers] API result:', result)
+    if (!result) {
+      console.error('[searchUsers] API returned null - check server logs for errors')
+      return []
+    }
+    const paginatedData = extractPaginatedData(result)
+    console.log('[searchUsers] Extracted data:', paginatedData)
+    if (!paginatedData || !Array.isArray(paginatedData.data)) {
+      console.error('[searchUsers] Invalid data format:', paginatedData)
+      return []
+    }
+    return paginatedData.data
+  } catch (error) {
+    console.error('[searchUsers] Error:', error)
+    return []
+  }
+}
 
 export async function getJourney(
   entityType: 'user' | 'team',
