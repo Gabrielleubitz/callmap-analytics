@@ -91,19 +91,16 @@ export default function BillingPage() {
             title="MRR"
             value={formatCurrency(metrics.data.mrr || 0)}
             icon={<DollarSign className="h-5 w-5" />}
-            description="Monthly Recurring Revenue"
           />
           <HeroMetricCard
             title="Total Revenue"
             value={formatCurrency(metrics.data.totalRevenue || 0)}
             icon={<TrendingUp className="h-5 w-5" />}
-            description="Total revenue in date range"
           />
           <HeroMetricCard
             title="Unpaid Invoices"
             value={formatCurrency(metrics.data.unpaidInvoices || 0)}
             icon={<AlertCircle className="h-5 w-5" />}
-            description="Outstanding amount"
           />
         </div>
       ) : null}
@@ -114,7 +111,6 @@ export default function BillingPage() {
           {/* Revenue Section */}
           <MetricGroupCard
             title="Revenue"
-            icon={<DollarSign className="h-4 w-4" />}
             metrics={[
               {
                 label: "MRR",
@@ -134,7 +130,6 @@ export default function BillingPage() {
           {/* Subscriptions Section */}
           <MetricGroupCard
             title="Subscriptions"
-            icon={<Users className="h-4 w-4" />}
             metrics={[
               {
                 label: "Paying Teams",

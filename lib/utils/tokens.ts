@@ -105,12 +105,16 @@ export async function getTokenUsageFromJobs(
   start: Date,
   end: Date
 ): Promise<AggregatedTokenUsage> {
+  if (!adminDb) {
+    return { tokensIn: 0, tokensOut: 0, totalTokens: 0, cost: 0, byModel: new Map() }
+  }
+  const db = adminDb
   const startTimestamp = toFirestoreTimestamp(start)
   const endTimestamp = toFirestoreTimestamp(end)
 
   let jobsSnapshot
   try {
-    jobsSnapshot = await adminDb
+    jobsSnapshot = await db
       .collection(FIRESTORE_COLLECTIONS.aiJobs)
       .where('createdAt', '>=', startTimestamp)
       .where('createdAt', '<=', endTimestamp)
@@ -118,7 +122,7 @@ export async function getTokenUsageFromJobs(
   } catch (error) {
     // Fallback: Get all and filter client-side if index missing
     console.warn('[Tokens] Missing index for processingJobs.createdAt query, using fallback')
-    const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
+    const allJobs = await db.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
     jobsSnapshot = {
       docs: allJobs.docs.filter((doc) => {
         const createdAt = toDate(doc.data().createdAt)
@@ -145,12 +149,16 @@ export async function getTeamTokenUsage(
   start: Date,
   end: Date
 ): Promise<AggregatedTokenUsage> {
+  if (!adminDb) {
+    return { tokensIn: 0, tokensOut: 0, totalTokens: 0, cost: 0, byModel: new Map() }
+  }
+  const db = adminDb
   const startTimestamp = toFirestoreTimestamp(start)
   const endTimestamp = toFirestoreTimestamp(end)
 
   let jobsSnapshot
   try {
-    jobsSnapshot = await adminDb
+    jobsSnapshot = await db
       .collection(FIRESTORE_COLLECTIONS.aiJobs)
       .where('workspaceId', '==', teamId)
       .where('createdAt', '>=', startTimestamp)
@@ -159,7 +167,7 @@ export async function getTeamTokenUsage(
   } catch (error) {
     // Fallback: Get all and filter
     console.warn('[Tokens] Missing index for team token usage query, using fallback')
-    const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
+    const allJobs = await db.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
     jobsSnapshot = {
       docs: allJobs.docs.filter((doc) => {
         const data = doc.data()
@@ -199,12 +207,14 @@ export async function getDailyTokenUsage(
   start: Date,
   end: Date
 ): Promise<Map<string, number>> {
+  if (!adminDb) return new Map<string, number>()
+  const db = adminDb
   const startTimestamp = toFirestoreTimestamp(start)
   const endTimestamp = toFirestoreTimestamp(end)
 
   let jobsSnapshot
   try {
-    jobsSnapshot = await adminDb
+    jobsSnapshot = await db
       .collection(FIRESTORE_COLLECTIONS.aiJobs)
       .where('createdAt', '>=', startTimestamp)
       .where('createdAt', '<=', endTimestamp)
@@ -212,7 +222,7 @@ export async function getDailyTokenUsage(
   } catch (error) {
     // Fallback
     console.warn('[Tokens] Missing index for daily token usage query, using fallback')
-    const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
+    const allJobs = await db.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
     jobsSnapshot = {
       docs: allJobs.docs.filter((doc) => {
         const createdAt = toDate(doc.data().createdAt)
@@ -244,12 +254,14 @@ export async function getDailyTokenUsageByModel(
   start: Date,
   end: Date
 ): Promise<Map<string, Map<string, number>>> {
+  if (!adminDb) return new Map<string, Map<string, number>>()
+  const db = adminDb
   const startTimestamp = toFirestoreTimestamp(start)
   const endTimestamp = toFirestoreTimestamp(end)
 
   let jobsSnapshot
   try {
-    jobsSnapshot = await adminDb
+    jobsSnapshot = await db
       .collection(FIRESTORE_COLLECTIONS.aiJobs)
       .where('createdAt', '>=', startTimestamp)
       .where('createdAt', '<=', endTimestamp)
@@ -257,7 +269,7 @@ export async function getDailyTokenUsageByModel(
   } catch (error) {
     // Fallback
     console.warn('[Tokens] Missing index for daily token usage by model query, using fallback')
-    const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
+    const allJobs = await db.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
     jobsSnapshot = {
       docs: allJobs.docs.filter((doc) => {
         const createdAt = toDate(doc.data().createdAt)

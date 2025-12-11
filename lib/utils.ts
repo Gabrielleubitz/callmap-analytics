@@ -24,9 +24,9 @@ export function formatDate(date: Date | string | null | undefined): string {
     d = new Date(date)
   } else if (date instanceof Date) {
     d = date
-  } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+  } else if (date && typeof date === 'object' && 'toDate' in date && typeof (date as any).toDate === 'function') {
     // Firestore Timestamp
-    d = date.toDate()
+    d = (date as any).toDate()
   } else {
     return '-'
   }
@@ -51,9 +51,9 @@ export function formatDateTime(date: Date | string | null | undefined): string {
     d = new Date(date)
   } else if (date instanceof Date) {
     d = date
-  } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+  } else if (date && typeof date === 'object' && 'toDate' in date && typeof (date as any).toDate === 'function') {
     // Firestore Timestamp
-    d = date.toDate()
+    d = (date as any).toDate()
   } else {
     return '-'
   }

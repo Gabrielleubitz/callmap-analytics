@@ -19,7 +19,9 @@ import { Plan } from '../types'
  * Uses: lib/config.ts PLAN_PRICES
  */
 export async function calculateMRR(): Promise<number> {
-  const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+  if (!adminDb) return 0
+  const db = adminDb
+  const workspacesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.teams).get()
   
   let mrr = 0
   for (const doc of workspacesSnapshot.docs) {
@@ -37,7 +39,9 @@ export async function calculateMRR(): Promise<number> {
  * Field: workspaces.plan
  */
 export async function countPayingTeams(): Promise<number> {
-  const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+  if (!adminDb) return 0
+  const db = adminDb
+  const workspacesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.teams).get()
   
   let count = 0
   for (const doc of workspacesSnapshot.docs) {
@@ -62,8 +66,11 @@ export async function calculateRevenueFromPayments(
 ): Promise<number> {
   let totalRevenue = 0
   
+  if (!adminDb) return 0
+  const db = adminDb
+  
   try {
-    const paymentsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.payments).get()
+    const paymentsSnapshot = await db.collection(FIRESTORE_COLLECTIONS.payments).get()
     for (const doc of paymentsSnapshot.docs) {
       const data = doc.data()
       const createdAt = toDate(data.createdAt)
@@ -90,8 +97,11 @@ export async function calculateRevenueFromInvoices(
 ): Promise<number> {
   let totalRevenue = 0
   
+  if (!adminDb) return 0
+  const db = adminDb
+  
   try {
-    const invoicesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.invoices).get()
+    const invoicesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.invoices).get()
     for (const doc of invoicesSnapshot.docs) {
       const data = doc.data()
       const paidAt = toDate(data.paidAt || data.paid_at)
@@ -134,8 +144,11 @@ export async function calculateTotalRevenue(
 export async function calculateUnpaidInvoices(): Promise<number> {
   let unpaidTotal = 0
   
+  if (!adminDb) return 0
+  const db = adminDb
+  
   try {
-    const invoicesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.invoices).get()
+    const invoicesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.invoices).get()
     for (const doc of invoicesSnapshot.docs) {
       const data = doc.data()
       const status = data.status
@@ -159,11 +172,13 @@ export async function calculateRevenueByPlan(
   start: Date,
   end: Date
 ): Promise<Map<Plan, number>> {
+  if (!adminDb) return new Map<Plan, number>()
+  const db = adminDb
   const planRevenue = new Map<Plan, number>()
   
   // Get all payments in range
   try {
-    const paymentsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.payments).get()
+    const paymentsSnapshot = await db.collection(FIRESTORE_COLLECTIONS.payments).get()
     for (const doc of paymentsSnapshot.docs) {
       const data = doc.data()
       const createdAt = toDate(data.createdAt)
@@ -171,7 +186,7 @@ export async function calculateRevenueByPlan(
         const workspaceId = data.workspaceId || data.teamId
         if (workspaceId) {
           try {
-            const workspaceDoc = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).doc(workspaceId).get()
+            const workspaceDoc = await db.collection(FIRESTORE_COLLECTIONS.teams).doc(workspaceId).get()
             if (workspaceDoc.exists) {
               const plan = (workspaceDoc.data()?.plan || 'free') as Plan
               const amount = data.amountUsd || data.amount_usd || 0
@@ -188,8 +203,9 @@ export async function calculateRevenueByPlan(
   }
   
   // Also check invoices
+  
   try {
-    const invoicesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.invoices).get()
+    const invoicesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.invoices).get()
     for (const doc of invoicesSnapshot.docs) {
       const data = doc.data()
       const paidAt = toDate(data.paidAt || data.paid_at)
@@ -197,7 +213,7 @@ export async function calculateRevenueByPlan(
         const workspaceId = data.workspaceId || data.teamId
         if (workspaceId) {
           try {
-            const workspaceDoc = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).doc(workspaceId).get()
+            const workspaceDoc = await db.collection(FIRESTORE_COLLECTIONS.teams).doc(workspaceId).get()
             if (workspaceDoc.exists) {
               const plan = (workspaceDoc.data()?.plan || 'free') as Plan
               const amount = data.amountUsd || data.amount_usd || 0
@@ -224,11 +240,13 @@ export async function calculateDailyRevenue(
   start: Date,
   end: Date
 ): Promise<Map<string, number>> {
+  if (!adminDb) return new Map<string, number>()
+  const db = adminDb
   const dailyRevenue = new Map<string, number>()
   
   // Get payments
   try {
-    const paymentsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.payments).get()
+    const paymentsSnapshot = await db.collection(FIRESTORE_COLLECTIONS.payments).get()
     for (const doc of paymentsSnapshot.docs) {
       const data = doc.data()
       const createdAt = toDate(data.createdAt)
@@ -243,8 +261,9 @@ export async function calculateDailyRevenue(
   }
   
   // Also check invoices
+  
   try {
-    const invoicesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.invoices).get()
+    const invoicesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.invoices).get()
     for (const doc of invoicesSnapshot.docs) {
       const data = doc.data()
       const paidAt = toDate(data.paidAt || data.paid_at)

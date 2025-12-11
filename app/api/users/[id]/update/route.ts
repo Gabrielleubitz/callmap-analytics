@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
 import { userUpdateSchema } from '@/lib/schemas'
 import { toFirestoreTimestamp } from '@/lib/utils/date'
+import { validationError } from '@/lib/utils/api-response'
 
 /**
  * Update user data

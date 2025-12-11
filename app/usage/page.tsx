@@ -121,19 +121,16 @@ export default function UsagePage() {
             title="Total Tokens"
             value={formatNumber(totalTokens)}
             icon={<Zap className="h-5 w-5" />}
-            description={`${formatNumber(metrics.data.totalTokensIn || 0)} in • ${formatNumber(metrics.data.totalTokensOut || 0)} out`}
           />
           <HeroMetricCard
             title="Total Cost"
             value={formatCurrency(metrics.data.totalCost || 0)}
             icon={<DollarSign className="h-5 w-5" />}
-            description="Estimated token cost"
           />
           <HeroMetricCard
             title="Avg Tokens/Session"
             value={formatNumber(metrics.data.avgTokensPerSession || 0)}
             icon={<TrendingUp className="h-5 w-5" />}
-            description="Average per session"
           />
         </div>
       ) : null}
@@ -144,7 +141,6 @@ export default function UsagePage() {
           {/* Token Usage Section */}
           <MetricGroupCard
             title="Token Usage"
-            icon={<Database className="h-4 w-4" />}
             metrics={[
               {
                 label: "Tokens In",
@@ -164,7 +160,6 @@ export default function UsagePage() {
           {/* Session Metrics Section */}
           <MetricGroupCard
             title="Session Metrics"
-            icon={<Activity className="h-4 w-4" />}
             metrics={[
               {
                 label: "Avg Tokens/Session",

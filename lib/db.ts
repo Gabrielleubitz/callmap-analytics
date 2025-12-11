@@ -74,6 +74,41 @@ function extractPaginatedData<T>(response: { items: T[]; total: number } | null)
   }
 }
 
+// Import types for use in function parameters
+import type {
+  DateRange,
+  Plan,
+  OverviewMetrics,
+  UsageMetrics,
+  BillingMetrics,
+  AIJobStats,
+  Team,
+  User,
+  Session,
+  AIJob,
+  SessionSourceType,
+  TeamsParams,
+  UsersParams,
+  PaginationParams,
+  Subscription,
+  Invoice,
+  Payment,
+  Credit,
+  FeatureFlagOverride,
+  APIKey,
+  WebhookEndpoint,
+  AuditLog,
+  SessionStatus,
+  SubscriptionStatus,
+  InvoiceStatus,
+  CreditType,
+  AIJobType,
+  AIJobStatus,
+  WebhookLog,
+  PaginatedResponse,
+} from './types'
+import type { MetricResponse } from './utils/api-response'
+
 // Re-export types from central types file
 export type {
   DateRange,
@@ -977,13 +1012,12 @@ export async function searchUsers(query: string, limit = 10): Promise<UserSearch
       console.error('[searchUsers] API returned null - check server logs for errors')
       return []
     }
-    const paginatedData = extractPaginatedData(result)
-    console.log('[searchUsers] Extracted data:', paginatedData)
-    if (!paginatedData || !Array.isArray(paginatedData.data)) {
-      console.error('[searchUsers] Invalid data format:', paginatedData)
+    // PaginatedResponse already has the correct structure
+    if (!result.data || !Array.isArray(result.data)) {
+      console.error('[searchUsers] Invalid data format:', result)
       return []
     }
-    return paginatedData.data
+    return result.data
   } catch (error) {
     console.error('[searchUsers] Error:', error)
     return []

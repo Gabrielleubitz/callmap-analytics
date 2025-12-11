@@ -28,14 +28,16 @@ export default function SetupMFAPage() {
         return
       }
 
+      const mfaStatus = await getMFAStatus(user)
+      
       // Check if MFA is available
-      if (!user.multiFactor) {
+      // Type assertion needed because multiFactor may not be in type definitions
+      const userWithMFA = user as any
+      if (!userWithMFA.multiFactor) {
         setError('Multi-factor authentication is not enabled in Firebase. Please enable it in Firebase Console > Authentication > Sign-in method > Multi-factor authentication, then refresh this page.')
         setIsLoading(false)
         return
       }
-
-      const mfaStatus = await getMFAStatus(user)
       if (mfaStatus.isEnrolled) {
         setIsEnrolled(true)
         setIsLoading(false)

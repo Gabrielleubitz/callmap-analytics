@@ -92,7 +92,6 @@ export default function OpsPage() {
                 title="Failure Rate"
                 value={`${(aiJobStats.data.failureRate || 0).toFixed(1)}%`}
                 icon={<AlertTriangle className="h-5 w-5" />}
-                description="Failed jobs percentage"
               />
               <HeroMetricCard
                 title="Longest Running Job"
@@ -100,13 +99,11 @@ export default function OpsPage() {
                   ? `${(aiJobStats.data.longestRunningJob / 60).toFixed(1)}m`
                   : "-"}
                 icon={<Clock className="h-5 w-5" />}
-                description="Maximum duration"
               />
               <HeroMetricCard
                 title="Total Jobs"
                 value={formatNumber(aiJobsArray.length || 0)}
                 icon={<Activity className="h-5 w-5" />}
-                description="Jobs in date range"
               />
             </div>
           ) : null}
@@ -219,13 +216,11 @@ export default function OpsPage() {
               title="Endpoints"
               value={formatNumber(webhookEndpointsArray.length || 0)}
               icon={<Activity className="h-5 w-5" />}
-              description="Total webhook endpoints"
             />
             <HeroMetricCard
               title="Total Logs"
               value={formatNumber(webhookLogsArray.length || 0)}
               icon={<CheckCircle className="h-5 w-5" />}
-              description="Webhook delivery logs"
             />
             <HeroMetricCard
               title="Failed Logs"
@@ -233,7 +228,6 @@ export default function OpsPage() {
                 webhookLogsArray.filter((l: any) => l.status_code && l.status_code >= 400).length || 0
               )}
               icon={<XCircle className="h-5 w-5" />}
-              description="Failed deliveries"
             />
           </div>
 
@@ -388,7 +382,6 @@ export default function OpsPage() {
               title="Failed Jobs"
               value={formatNumber(failedJobs.length)}
               icon={<AlertTriangle className="h-5 w-5" />}
-              description="AI jobs that failed"
             />
             <HeroMetricCard
               title="Failed Webhooks"
@@ -396,7 +389,6 @@ export default function OpsPage() {
                 webhookLogsArray.filter((l: any) => l.status_code && l.status_code >= 400).length || 0
               )}
               icon={<XCircle className="h-5 w-5" />}
-              description="Webhook delivery failures"
             />
           </div>
 

@@ -279,14 +279,14 @@ export default function OverviewPage() {
   const systemHealth = useMemo(() => {
     const stuckJobs = recentFailures.data?.filter(job => {
       // Jobs that are older than 1 hour and still in progress
-      const jobDate = job.created_at ? new Date(job.created_at) : null
+      const jobDate = job.started_at ? new Date(job.started_at) : null
       if (!jobDate) return false
       const hoursAgo = (new Date().getTime() - jobDate.getTime()) / (1000 * 60 * 60)
       return hoursAgo > 1 && job.status === 'processing'
     }).length || 0
 
     const apiErrors = recentFailures.data?.filter(job => 
-      job.status === 'failed' || job.status === 'error'
+      job.status === 'failed'
     ).length || 0
 
     // Check for missing billing data (simplified check)

@@ -105,7 +105,9 @@ export async function signOut(): Promise<void> {
  * Check if MFA is required (user has MFA enrolled)
  */
 export async function checkMFARequired(user: User): Promise<boolean> {
-  const multiFactor = user.multiFactor
+  // Type assertion needed because multiFactor may not be in type definitions
+  const userWithMFA = user as any
+  const multiFactor = userWithMFA.multiFactor
   if (!multiFactor) return false
   
   const enrolledFactors = multiFactor.enrolledFactors
@@ -126,7 +128,9 @@ export async function getMFAStatus(user: User | null): Promise<{
     return { isEnrolled: false, enrolledFactors: [] }
   }
   
-  const multiFactor = user.multiFactor
+  // Type assertion needed because multiFactor may not be in type definitions
+  const userWithMFA = user as any
+  const multiFactor = userWithMFA.multiFactor
   if (!multiFactor) {
     return { isEnrolled: false, enrolledFactors: [] }
   }
@@ -155,18 +159,22 @@ export async function startTOTPEnrollment(user: User): Promise<{
   getAuthInstance() // Ensure auth is initialized
 
   // Check if multiFactor is available
-  if (!user.multiFactor) {
+  // Type assertion needed because multiFactor may not be in type definitions
+  const userWithMFA = user as any
+  if (!userWithMFA.multiFactor) {
     throw new Error('Multi-factor authentication is not enabled. Please enable MFA in Firebase Console > Authentication > Sign-in method > Multi-factor authentication.')
   }
 
-  const multiFactor = user.multiFactor
+  const multiFactor = userWithMFA.multiFactor
   
   try {
     // Get MFA session (this requires the user to be recently authenticated)
     const session = await multiFactor.getSession()
     
     // Generate TOTP secret
-    const secret = await TotpMultiFactorGenerator.generateSecret(session)
+    const totpSecret = await TotpMultiFactorGenerator.generateSecret(session)
+    // TotpSecret is an object with a secret property, but TypeScript types may not expose it
+    const secret = (totpSecret as any).secret || String(totpSecret)
     
     // Generate QR code URL for authenticator apps
     const accountName = user.email || user.uid
@@ -203,7 +211,9 @@ export async function completeTOTPEnrollment(
 ): Promise<void> {
   getAuthInstance() // Ensure auth is initialized
 
-  const multiFactor = user.multiFactor
+  // Type assertion needed because multiFactor may not be in type definitions
+  const userWithMFA = user as any
+  const multiFactor = userWithMFA.multiFactor
   if (!multiFactor) {
     throw new Error('Multi-factor authentication not available for this user')
   }
@@ -347,28 +357,8 @@ export async function getIdToken(user: User | null, forceRefresh = false): Promi
         }
       }
       
-      // Force re-initialization as last resort
-      console.log('[getIdToken] Firebase app not initialized, re-initializing...')
-      if (typeof window !== 'undefined') {
-        // Clear and re-initialize
-        auth = undefined
-        app = undefined
-        initializeFirebaseAuth()
-        
-        // Wait for initialization
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Get the new auth instance and current user
-        const newAuthInstance = getAuthInstance()
-        if (newAuthInstance.currentUser) {
-          try {
-            return await newAuthInstance.currentUser.getIdToken(forceRefresh)
-          } catch (finalError: any) {
-            console.error('[getIdToken] Final retry failed:', finalError)
-            throw new Error(`Failed to get ID token: ${finalError.message || 'Unknown error'}`)
-          }
-        }
-      }
+      // Note: Re-initialization removed - we use getFirebaseAuth() which handles initialization
+      // If we get here, it's a persistent error that requires user to sign in again
     }
     
     throw new Error(`Failed to get ID token: ${error.message || 'Unknown error'}`)
