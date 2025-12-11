@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore'
 
 function toDate(dateOrTimestamp: any): Date {
   if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const pageSize = body.pageSize || 20
 
     // Get mindmaps (sessions) for this user
-    let mindmapsSnapshot
+    let mindmapsSnapshot: admin.firestore.QuerySnapshot
     try {
       mindmapsSnapshot = await db
         .collection('mindmaps')
@@ -33,16 +34,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     } catch (error) {
       // If query fails, get all and filter
       const allMindmaps = await db.collection('mindmaps').get()
+      const filteredDocs = allMindmaps.docs.filter((doc: QueryDocumentSnapshot) => {
+        const data = doc.data()
+        return data.userId === userId
+      })
       mindmapsSnapshot = {
-        docs: allMindmaps.docs.filter((doc) => {
-          const data = doc.data()
-          return data.userId === userId
-        }),
-      } as any
+        ...allMindmaps,
+        docs: filteredDocs,
+      } as admin.firestore.QuerySnapshot
     }
 
     // Transform to sessions
-    let sessions = mindmapsSnapshot.docs.map((doc) => {
+    let sessions = mindmapsSnapshot.docs.map((doc: QueryDocumentSnapshot) => {
       const data = doc.data()
       return {
         id: doc.id,
