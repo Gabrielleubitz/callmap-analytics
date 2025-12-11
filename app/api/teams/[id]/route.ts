@@ -10,13 +10,17 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const teamId = params.id
     const body = await request.json()
     const start = body.start ? new Date(body.start) : null
     const end = body.end ? new Date(body.end) : null
 
     // Get workspace
-    const workspaceDoc = await adminDb.collection('workspaces').doc(teamId).get()
+    const workspaceDoc = await adminDb!.collection('workspaces').doc(teamId).get()
     if (!workspaceDoc.exists) {
       return NextResponse.json(null)
     }

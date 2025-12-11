@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 
 function toDate(dateOrTimestamp: any): Date | null {
   if (!dateOrTimestamp) return null
@@ -11,6 +12,10 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
+    }
+
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
@@ -21,7 +26,7 @@ export async function POST(request: NextRequest) {
     let subscriptions: any[] = []
 
     try {
-      const subscriptionsSnapshot = await adminDb.collection('subscriptions').get()
+      const subscriptionsSnapshot = await adminDb!.collection('subscriptions').get()
       subscriptions = subscriptionsSnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
@@ -39,7 +44,7 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       // If subscriptions collection doesn't exist, derive from workspaces
-      const workspacesSnapshot = await adminDb.collection('workspaces').get()
+      const workspacesSnapshot = await adminDb!.collection('workspaces').get()
       subscriptions = workspacesSnapshot.docs.map((doc) => {
         const data = doc.data()
         return {

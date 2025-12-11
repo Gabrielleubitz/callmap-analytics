@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { dateRangeSchema, billingMetricsSchema } from '@/lib/schemas'
 import {
   calculateMRR,
@@ -37,10 +37,7 @@ export async function POST(request: NextRequest) {
     // Validate date range
     const dateRangeResult = dateRangeSchema.safeParse(body)
     if (!dateRangeResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid date range', details: dateRangeResult.error.errors },
-        { status: 400 }
-      )
+      return validationError(dateRangeResult.error)
     }
     
     const { start, end } = dateRangeResult.data

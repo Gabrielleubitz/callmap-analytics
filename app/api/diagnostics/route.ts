@@ -15,6 +15,10 @@ import { toDate } from '@/lib/utils/date'
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const diagnostics: Record<string, any> = {}
 
     // Collection counts
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     for (const { key, name } of collections) {
       try {
-        const snapshot = await adminDb.collection(name).get()
+        const snapshot = await adminDb!.collection(name).get()
         collectionCounts[key] = snapshot.size
       } catch (error) {
         collectionCounts[key] = -1 // Error indicator
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Sessions (mindmaps) timestamp range
     try {
-      const sessionsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.sessions).get()
+      const sessionsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.sessions).get()
       let oldestSession: Date | null = null
       let newestSession: Date | null = null
       
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // Users timestamp range
     try {
-      const usersSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.users).get()
+      const usersSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.users).get()
       let oldestUser: Date | null = null
       let newestUser: Date | null = null
       
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     // Teams timestamp range
     try {
-      const teamsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+      const teamsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.teams).get()
       let oldestTeam: Date | null = null
       let newestTeam: Date | null = null
       
@@ -123,8 +127,8 @@ export async function POST(request: NextRequest) {
 
     // Check: Subscriptions reference existing teams
     try {
-      const subscriptionsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.subscriptions).get()
-      const teamsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+      const subscriptionsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.subscriptions).get()
+      const teamsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.teams).get()
       const teamIds = new Set(teamsSnapshot.docs.map(doc => doc.id))
       
       let orphanedSubscriptions = 0
@@ -151,8 +155,8 @@ export async function POST(request: NextRequest) {
 
     // Check: Paying teams have subscriptions
     try {
-      const teamsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
-      const subscriptionsSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.subscriptions).get()
+      const teamsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.teams).get()
+      const subscriptionsSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.subscriptions).get()
       const teamsWithSubscriptions = new Set(
         subscriptionsSnapshot.docs.map(doc => doc.data().workspaceId || doc.data().teamId).filter(Boolean)
       )

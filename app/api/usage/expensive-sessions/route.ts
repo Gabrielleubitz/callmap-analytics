@@ -4,6 +4,7 @@ import { dateRangeSchema } from '@/lib/schemas'
 import { extractTokenUsageFromJob } from '@/lib/utils/tokens'
 import { toDate, toFirestoreTimestamp } from '@/lib/utils/date'
 import { FIRESTORE_COLLECTIONS } from '@/lib/config'
+import { validationError } from '@/lib/utils/api-response'
 
 /**
  * Most Expensive Sessions API
@@ -22,10 +23,7 @@ export async function POST(request: NextRequest) {
     // Validate date range
     const dateRangeResult = dateRangeSchema.safeParse(body)
     if (!dateRangeResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid date range', details: dateRangeResult.error.errors },
-        { status: 400 }
-      )
+      return validationError(dateRangeResult.error)
     }
     
     const { start, end } = dateRangeResult.data

@@ -27,12 +27,16 @@ export async function POST(request: NextRequest) {
     const pageSize = body.pageSize || 20
     const search = body.search || ''
 
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const collectionName = COLLECTION_MAP[tableName] || tableName
 
     // Get all documents
     let snapshot
     try {
-      snapshot = await adminDb.collection(collectionName).get()
+      snapshot = await adminDb!.collection(collectionName).get()
     } catch (error) {
       return NextResponse.json({ data: [], total: 0, columns: [] })
     }

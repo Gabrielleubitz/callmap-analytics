@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 import * as admin from 'firebase-admin'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
+    }
+
     const body = await request.json()
     const start = new Date(body.start)
     const end = new Date(body.end)
@@ -12,7 +17,7 @@ export async function POST(request: NextRequest) {
     const endTimestamp = admin.firestore.Timestamp.fromDate(end)
 
     // Get all workspaces
-    const workspacesSnapshot = await adminDb.collection('workspaces').get()
+    const workspacesSnapshot = await adminDb!.collection('workspaces').get()
     const workspaceMap = new Map<string, string>()
     workspacesSnapshot.forEach((doc) => {
       workspaceMap.set(doc.id, doc.data().name || doc.id)
@@ -21,14 +26,14 @@ export async function POST(request: NextRequest) {
     // Get processing jobs in range - handle missing index
     let jobsSnapshot
     try {
-      jobsSnapshot = await adminDb
+      jobsSnapshot = await adminDb!
         .collection('processingJobs')
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
         .get()
     } catch (error) {
       // If query fails, get all jobs and filter client-side
-      const allJobs = await adminDb.collection('processingJobs').get()
+      const allJobs = await adminDb!.collection('processingJobs').get()
       jobsSnapshot = {
         docs: allJobs.docs.filter((doc) => {
           const data = doc.data()
@@ -43,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate tokens per workspace
     const workspaceTokens = new Map<string, number>()
-    jobsSnapshot.forEach((doc) => {
+    jobsSnapshot.forEach((doc: any) => {
       const data = doc.data()
       const workspaceId = data.workspaceId || data.workspace_id
       if (workspaceId && workspaceMap.has(workspaceId)) {

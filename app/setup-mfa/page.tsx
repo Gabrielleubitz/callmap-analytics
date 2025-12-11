@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser, getIdToken, getMFAStatus, startTOTPEnrollment, completeTOTPEnrollment } from "@/lib/auth/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -20,11 +20,7 @@ export default function SetupMFAPage() {
   const [isEnrolled, setIsEnrolled] = useState(false)
   const [enrollmentSession, setEnrollmentSession] = useState<any>(null)
 
-  useEffect(() => {
-    checkMFAStatus()
-  }, [])
-
-  const checkMFAStatus = async () => {
+  const checkMFAStatus = useCallback(async () => {
     try {
       const user = getCurrentUser()
       if (!user) {
@@ -53,7 +49,11 @@ export default function SetupMFAPage() {
       setError(err.message || 'Failed to check MFA status')
       setIsLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    checkMFAStatus()
+  }, [checkMFAStatus])
 
   const startEnrollment = async () => {
     try {

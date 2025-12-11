@@ -11,12 +11,16 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const teamId = params.id
 
     // Get subscriptions
     let subscriptions: any[] = []
     try {
-      const subscriptionsSnapshot = await adminDb
+      const subscriptionsSnapshot = await adminDb!
         .collection('subscriptions')
         .where('workspaceId', '==', teamId)
         .get()
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       })
     } catch (error) {
       // If subscriptions don't exist, derive from workspace
-      const workspaceDoc = await adminDb.collection('workspaces').doc(teamId).get()
+      const workspaceDoc = await adminDb!.collection('workspaces').doc(teamId).get()
       if (workspaceDoc.exists) {
         const data = workspaceDoc.data()!
         subscriptions = [{
@@ -58,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get invoices
     let invoices: any[] = []
     try {
-      const invoicesSnapshot = await adminDb
+      const invoicesSnapshot = await adminDb!
         .collection('invoices')
         .where('workspaceId', '==', teamId)
         .get()
@@ -82,7 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get payments
     let payments: any[] = []
     try {
-      const paymentsSnapshot = await adminDb
+      const paymentsSnapshot = await adminDb!
         .collection('payments')
         .where('workspaceId', '==', teamId)
         .get()
@@ -104,7 +108,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get credits
     let credits: any[] = []
     try {
-      const creditsSnapshot = await adminDb
+      const creditsSnapshot = await adminDb!
         .collection('credits')
         .where('workspaceId', '==', teamId)
         .get()

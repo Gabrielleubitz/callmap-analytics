@@ -18,13 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Validate payload with zod
     const validationResult = userUpdateSchema.safeParse(body)
     if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid request data',
-          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
-        },
-        { status: 400 }
-      )
+      return validationError(validationResult.error)
     }
 
     const validatedData = validationResult.data

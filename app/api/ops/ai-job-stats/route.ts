@@ -12,6 +12,10 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const body = await request.json()
     const start = new Date(body.start)
     const end = new Date(body.end)
@@ -21,14 +25,14 @@ export async function POST(request: NextRequest) {
     // Get processing jobs in range
     let jobsSnapshot
     try {
-      jobsSnapshot = await adminDb
+      jobsSnapshot = await adminDb!
         .collection('processingJobs')
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
         .get()
     } catch (error) {
       // If query fails, get all and filter
-      const allJobs = await adminDb.collection('processingJobs').get()
+      const allJobs = await adminDb!.collection('processingJobs').get()
       jobsSnapshot = {
         docs: allJobs.docs.filter((doc) => {
           const data = doc.data()
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
     let longestDuration = 0
     const durationByType = new Map<string, { total: number; count: number }>()
 
-    jobsSnapshot.forEach((doc) => {
+    jobsSnapshot.forEach((doc: any) => {
       const data = doc.data()
       totalJobs++
       

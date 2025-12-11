@@ -44,7 +44,7 @@ export default function DataExplorerPage() {
       setLoading(false)
     }
     load()
-  }, [selectedTable, page, search])
+  }, [selectedTable, page, pageSize, search])
 
   return (
     <div className="container mx-auto px-4 py-8">

@@ -11,6 +11,10 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const teamId = params.id
     const body = await request.json()
     const page = body.page || 1
@@ -19,15 +23,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get mindmaps (sessions) for this team
     let mindmapsSnapshot
     try {
-      mindmapsSnapshot = await adminDb
+      mindmapsSnapshot = await adminDb!
         .collection('mindmaps')
         .where('workspaceId', '==', teamId)
         .get()
     } catch (error) {
       // If query fails, get all and filter
-      const allMindmaps = await adminDb.collection('mindmaps').get()
+      const allMindmaps = await adminDb!.collection('mindmaps').get()
       mindmapsSnapshot = {
-        docs: allMindmaps.docs.filter((doc) => {
+        docs: allMindmaps.docs.filter((doc: any) => {
           const data = doc.data()
           return (data.workspaceId || data.teamId) === teamId
         }),
@@ -35,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     // Transform to sessions
-    let sessions = mindmapsSnapshot.docs.map((doc) => {
+    let sessions = mindmapsSnapshot.docs.map((doc: any) => {
       const data = doc.data()
       return {
         id: doc.id,
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     })
 
     // Aggregate tokens and cost per session
-    sessions = sessions.map((session) => {
+    sessions = sessions.map((session: any) => {
       const jobs = jobsByMindmap.get(session.id) || []
       let tokensIn = 0
       let tokensOut = 0

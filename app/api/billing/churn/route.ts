@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 
 function toDate(dateOrTimestamp: any): Date | null {
   if (!dateOrTimestamp) return null
@@ -11,6 +12,10 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
+    }
+
     const body = await request.json()
     const start = new Date(body.start)
     const end = new Date(body.end)
@@ -19,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Get subscriptions (if they exist)
     try {
-      const subscriptionsSnapshot = await adminDb.collection('subscriptions').get()
+      const subscriptionsSnapshot = await adminDb!.collection('subscriptions').get()
       subscriptionsSnapshot.forEach((doc) => {
         const data = doc.data()
         const canceledAt = toDate(data.canceledAt || data.canceled_at)
@@ -31,7 +36,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // If subscriptions collection doesn't exist, check workspaces for canceled status
       try {
-        const workspacesSnapshot = await adminDb.collection('workspaces').get()
+        const workspacesSnapshot = await adminDb!.collection('workspaces').get()
         workspacesSnapshot.forEach((doc) => {
           const data = doc.data()
           const isActive = data.isActive !== false

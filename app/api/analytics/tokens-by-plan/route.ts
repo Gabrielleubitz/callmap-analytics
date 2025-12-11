@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 import * as admin from 'firebase-admin'
 
 export async function POST(request: NextRequest) {
@@ -10,8 +11,12 @@ export async function POST(request: NextRequest) {
     const startTimestamp = admin.firestore.Timestamp.fromDate(start)
     const endTimestamp = admin.firestore.Timestamp.fromDate(end)
 
+    if (!adminDb) {
+      return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
+    }
+
     // Get all workspaces with their plans
-    const workspacesSnapshot = await adminDb.collection('workspaces').get()
+    const workspacesSnapshot = await adminDb!.collection('workspaces').get()
     const planMap = new Map<string, string>()
     workspacesSnapshot.forEach((doc) => {
       planMap.set(doc.id, doc.data().plan || 'free')
@@ -20,7 +25,7 @@ export async function POST(request: NextRequest) {
     // Get processing jobs in range - handle missing index
     let jobsSnapshot
     try {
-      jobsSnapshot = await adminDb
+      jobsSnapshot = await adminDb!
         .collection('processingJobs')
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
@@ -28,7 +33,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // If query fails, try getting from usage collection
       try {
-        const usageSnapshot = await adminDb.collection('usage').get()
+        const usageSnapshot = await adminDb!.collection('usage').get()
         jobsSnapshot = {
           docs: [],
           forEach: async function(callback: any) {
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Group tokens by plan
     const planTokens = new Map<string, number>()
-    jobsSnapshot.forEach((doc) => {
+    jobsSnapshot.forEach((doc: any) => {
       const data = doc.data()
       const workspaceId = data.workspaceId || data.workspace_id
       const plan = planMap.get(workspaceId) || 'free'

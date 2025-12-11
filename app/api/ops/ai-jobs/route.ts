@@ -12,6 +12,10 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
@@ -27,17 +31,17 @@ export async function POST(request: NextRequest) {
       if (start && end) {
         const startTimestamp = admin.firestore.Timestamp.fromDate(start)
         const endTimestamp = admin.firestore.Timestamp.fromDate(end)
-        jobsSnapshot = await adminDb
+        jobsSnapshot = await adminDb!
           .collection('processingJobs')
           .where('createdAt', '>=', startTimestamp)
           .where('createdAt', '<=', endTimestamp)
           .get()
       } else {
-        jobsSnapshot = await adminDb.collection('processingJobs').get()
+        jobsSnapshot = await adminDb!.collection('processingJobs').get()
       }
     } catch (error) {
       // If query fails, get all and filter
-      const allJobs = await adminDb.collection('processingJobs').get()
+      const allJobs = await adminDb!.collection('processingJobs').get()
       jobsSnapshot = {
         docs: allJobs.docs.filter((doc) => {
           if (!start || !end) return true
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
       } as any
     }
 
-    let jobs = jobsSnapshot.docs.map((doc) => {
+    let jobs = jobsSnapshot.docs.map((doc: any) => {
       const data = doc.data()
       return {
         id: doc.id,
@@ -66,16 +70,16 @@ export async function POST(request: NextRequest) {
 
     // Apply filters
     if (type && type.length > 0) {
-      jobs = jobs.filter((j) => type.includes(j.type))
+      jobs = jobs.filter((j: any) => type.includes(j.type))
     }
 
     if (status && status.length > 0) {
-      jobs = jobs.filter((j) => status.includes(j.status))
+      jobs = jobs.filter((j: any) => status.includes(j.status))
     }
 
     if (teamId) {
       // Filter by workspaceId in jobs or get from session
-      jobs = jobs.filter((j) => {
+      jobs = jobs.filter((j: any) => {
         // This would require checking the session/workspace relationship
         // For now, we'll skip this filter if teamId is provided
         return true

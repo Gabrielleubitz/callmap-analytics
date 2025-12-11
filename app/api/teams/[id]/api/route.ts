@@ -11,12 +11,16 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
     const teamId = params.id
 
     // Get API keys
     let apiKeys: any[] = []
     try {
-      const apiKeysSnapshot = await adminDb
+      const apiKeysSnapshot = await adminDb!
         .collection('apiKeys')
         .where('workspaceId', '==', teamId)
         .get()
@@ -38,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get webhook endpoints
     let webhookEndpoints: any[] = []
     try {
-      const endpointsSnapshot = await adminDb
+      const endpointsSnapshot = await adminDb!
         .collection('webhookEndpoints')
         .where('workspaceId', '==', teamId)
         .get()

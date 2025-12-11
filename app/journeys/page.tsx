@@ -245,7 +245,7 @@ export default function JourneysPage() {
                   )}
                   {searchQuery && searchQuery.length >= 2 && !searching && searchResults.length === 0 && showSearchResults && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-sm text-gray-500">
-                      No users found matching "{searchQuery}". Check the browser console and server logs for details.
+                      No users found matching &quot;{searchQuery}&quot;. Check the browser console and server logs for details.
                     </div>
                   )}
                   {searchQuery && searchQuery.length >= 2 && !searching && !showSearchResults && (

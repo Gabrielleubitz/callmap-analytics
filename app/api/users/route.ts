@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     // Validate pagination params
     const paginationResult = paginationParamsSchema.safeParse({ page, pageSize })
     if (!paginationResult.success) {
-      return validationError(paginationResult.error.errors)
+      return validationError(paginationResult.error)
     }
 
     // Get all users

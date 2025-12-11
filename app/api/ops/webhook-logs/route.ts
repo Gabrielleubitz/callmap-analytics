@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 
 function toDate(dateOrTimestamp: any): Date {
   if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
@@ -10,6 +11,10 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
+    }
+
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
@@ -20,7 +25,7 @@ export async function POST(request: NextRequest) {
     // Get webhook logs
     let logsSnapshot
     try {
-      logsSnapshot = await adminDb.collection('webhookLogs').get()
+      logsSnapshot = await adminDb!.collection('webhookLogs').get()
     } catch (error) {
       return NextResponse.json({ data: [], total: 0 })
     }
