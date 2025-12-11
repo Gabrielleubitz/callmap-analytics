@@ -22,10 +22,13 @@ export async function POST(request: NextRequest) {
     const teamId = body.teamId
     const status = body.status
 
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     // Get invoices
     let invoicesSnapshot
     try {
-      invoicesSnapshot = await adminDb!.collection('invoices').get()
+      invoicesSnapshot = await db.collection('invoices').get()
     } catch (error) {
       return NextResponse.json({ data: [], total: 0 })
     }

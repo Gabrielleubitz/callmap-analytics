@@ -11,6 +11,13 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ data: [], total: 0 })
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.id
     const body = await request.json()
     const page = body.page || 1
@@ -19,13 +26,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get mindmaps (sessions) for this user
     let mindmapsSnapshot
     try {
-      mindmapsSnapshot = await adminDb
+      mindmapsSnapshot = await db
         .collection('mindmaps')
         .where('userId', '==', userId)
         .get()
     } catch (error) {
       // If query fails, get all and filter
-      const allMindmaps = await adminDb.collection('mindmaps').get()
+      const allMindmaps = await db.collection('mindmaps').get()
       mindmapsSnapshot = {
         docs: allMindmaps.docs.filter((doc) => {
           const data = doc.data()
@@ -54,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     })
 
     // Get tokens and cost from processing jobs
-    const jobsSnapshot = await adminDb.collection('processingJobs').get()
+    const jobsSnapshot = await db.collection('processingJobs').get()
     const jobsByMindmap = new Map<string, any[]>()
     jobsSnapshot.forEach((jobDoc) => {
       const jobData = jobDoc.data()

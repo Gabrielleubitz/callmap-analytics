@@ -15,13 +15,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
     }
 
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const teamId = params.id
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
 
     // Get users for this team
-    const usersSnapshot = await adminDb!
+    const usersSnapshot = await db
       .collection('users')
       .where('workspaceId', '==', teamId)
       .get()
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // If no users found with workspaceId, try getting all and filtering
     if (allUsers.length === 0) {
-      const allUsersSnapshot = await adminDb.collection('users').get()
+      const allUsersSnapshot = await db.collection('users').get()
       allUsers = allUsersSnapshot.docs
         .filter((doc) => {
           const data = doc.data()

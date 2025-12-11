@@ -11,10 +11,17 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(null)
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.id
 
     // Get user
-    const userDoc = await adminDb.collection('users').doc(userId).get()
+    const userDoc = await db.collection('users').doc(userId).get()
     if (!userDoc.exists) {
       return NextResponse.json(null)
     }

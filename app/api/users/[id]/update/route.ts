@@ -12,6 +12,16 @@ import { toFirestoreTimestamp } from '@/lib/utils/date'
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin not initialized' },
+        { status: 500 }
+      )
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.id
     const body = await request.json()
 
@@ -43,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp()
 
     // Check if user exists
-    const userDoc = await adminDb.collection('users').doc(userId).get()
+    const userDoc = await db.collection('users').doc(userId).get()
     if (!userDoc.exists) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -52,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     // Update the user document
-    await adminDb.collection('users').doc(userId).update(updateData)
+    await db.collection('users').doc(userId).update(updateData)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

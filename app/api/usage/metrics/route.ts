@@ -28,6 +28,13 @@ import { metricResponse, errorResponse, validationError } from '@/lib/utils/api-
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return errorResponse('Firebase Admin not initialized', 500)
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     
     // Validate date range
@@ -50,7 +57,7 @@ export async function POST(request: NextRequest) {
     try {
       const startTimestamp = toFirestoreTimestamp(start)
       const endTimestamp = toFirestoreTimestamp(end)
-      const mindmapsSnapshot = await adminDb
+      const mindmapsSnapshot = await db
         .collection(FIRESTORE_COLLECTIONS.sessions)
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
       // Fallback: Get all and filter client-side if index missing
       console.warn('[Usage Metrics] Missing index for mindmaps.createdAt query, using fallback')
       try {
-        const allMindmaps = await adminDb.collection(FIRESTORE_COLLECTIONS.sessions).get()
+        const allMindmaps = await db.collection(FIRESTORE_COLLECTIONS.sessions).get()
         sessionCount = allMindmaps.docs.filter((doc) => {
           const createdAt = toDate(doc.data().createdAt)
           return createdAt && createdAt >= start && createdAt <= end

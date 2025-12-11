@@ -10,6 +10,13 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ data: [], total: 0 })
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.id
     const body = await request.json()
     const page = body.page || 1
@@ -18,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Get audit logs
     let logsSnapshot
     try {
-      logsSnapshot = await adminDb
+      logsSnapshot = await db
         .collection('auditLogs')
         .where('userId', '==', userId)
         .get()

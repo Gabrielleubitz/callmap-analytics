@@ -26,8 +26,18 @@ import { calculateQuotaPercentage } from '@/lib/utils/metrics'
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin not initialized' },
+        { status: 500 }
+      )
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     // Get all workspaces
-    const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+    const workspacesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.teams).get()
     const result: Array<{ team_id: string; team_name: string; quota: number; used: number; percentage: number }> = []
 
     for (const workspaceDoc of workspacesSnapshot.docs) {

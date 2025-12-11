@@ -11,6 +11,13 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ data: [], total: 0 })
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
@@ -22,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Get all mindmaps (sessions)
     let mindmapsSnapshot
     try {
-      mindmapsSnapshot = await adminDb.collection('mindmaps').get()
+      mindmapsSnapshot = await db.collection('mindmaps').get()
     } catch (error) {
       return NextResponse.json({ data: [], total: 0 })
     }
@@ -47,7 +54,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Get tokens and cost from processing jobs
-    const jobsSnapshot = await adminDb.collection('processingJobs').get()
+    const jobsSnapshot = await db.collection('processingJobs').get()
     const jobsByMindmap = new Map<string, any[]>()
     jobsSnapshot.forEach((jobDoc) => {
       const jobData = jobDoc.data()

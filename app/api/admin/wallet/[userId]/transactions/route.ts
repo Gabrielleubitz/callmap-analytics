@@ -16,13 +16,16 @@ export async function GET(
       return NextResponse.json(errorResponse('Firebase Admin not initialized'), { status: 500 })
     }
 
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.userId
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1', 10)
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10)
 
     // Get wallet transactions
-    const transactionsRef = adminDb
+    const transactionsRef = db
       .collection('users')
       .doc(userId)
       .collection('walletTransactions')
@@ -36,7 +39,7 @@ export async function GET(
     }))
 
     // Get total count
-    const countSnap = await adminDb
+    const countSnap = await db
       .collection('users')
       .doc(userId)
       .collection('walletTransactions')

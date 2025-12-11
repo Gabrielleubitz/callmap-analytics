@@ -3,12 +3,19 @@ import { adminDb } from '@/lib/firebase-admin'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    if (!adminDb) {
+      return NextResponse.json([])
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const userId = params.id
 
     // Get feature flag overrides for this user
     let overridesSnapshot
     try {
-      overridesSnapshot = await adminDb
+      overridesSnapshot = await db
         .collection('featureFlagOverrides')
         .where('userId', '==', userId)
         .get()

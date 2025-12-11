@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorResponse('Firebase Admin not initialized', 500), { status: 500 })
     }
 
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     const start = new Date(body.start)
     const end = new Date(body.end)
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Get subscriptions (if they exist)
     try {
-      const subscriptionsSnapshot = await adminDb!.collection('subscriptions').get()
+      const subscriptionsSnapshot = await db.collection('subscriptions').get()
       subscriptionsSnapshot.forEach((doc) => {
         const data = doc.data()
         const canceledAt = toDate(data.canceledAt || data.canceled_at)
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // If subscriptions collection doesn't exist, check workspaces for canceled status
       try {
-        const workspacesSnapshot = await adminDb!.collection('workspaces').get()
+        const workspacesSnapshot = await db.collection('workspaces').get()
         workspacesSnapshot.forEach((doc) => {
           const data = doc.data()
           const isActive = data.isActive !== false

@@ -15,6 +15,13 @@ import { User } from '@/lib/types'
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return errorResponse('Firebase Admin not initialized', 500)
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     const page = body.page || 1
     const pageSize = body.pageSize || 20
@@ -33,14 +40,14 @@ export async function POST(request: NextRequest) {
     // Get all users
     let usersSnapshot
     try {
-      usersSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.users).get()
+      usersSnapshot = await db.collection(FIRESTORE_COLLECTIONS.users).get()
     } catch (error: any) {
       console.error('[Users] Error fetching users:', error)
       return errorResponse('Failed to fetch users', 500, error.message)
     }
 
     // Get workspaces to map team IDs to names
-    const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
+    const workspacesSnapshot = await db.collection(FIRESTORE_COLLECTIONS.teams).get()
     const workspaceMap = new Map<string, string>()
     workspacesSnapshot.forEach((doc) => {
       workspaceMap.set(doc.id, doc.data().name || doc.id)
