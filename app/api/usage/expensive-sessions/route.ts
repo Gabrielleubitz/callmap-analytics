@@ -18,6 +18,13 @@ import { validationError } from '@/lib/utils/api-response'
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     
     // Validate date range
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Get processing jobs in range
     let jobsSnapshot
     try {
-      jobsSnapshot = await adminDb
+      jobsSnapshot = await db
         .collection(FIRESTORE_COLLECTIONS.aiJobs)
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
@@ -42,7 +49,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // Fallback: Get all and filter if index missing
       console.warn('[Expensive Sessions] Missing index for processingJobs.createdAt query, using fallback')
-      const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
+      const allJobs = await db.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
       jobsSnapshot = {
         docs: allJobs.docs.filter((doc) => {
           const createdAt = toDate(doc.data().createdAt)

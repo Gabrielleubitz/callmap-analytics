@@ -19,6 +19,13 @@ import { validationError } from '@/lib/utils/api-response'
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
+    }
+
+    // Store in local const so TypeScript knows it's not null
+    const db = adminDb
+
     const body = await request.json()
     
     // Validate date range
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Get mindmaps (sessions) in date range
     let mindmapsSnapshot
     try {
-      mindmapsSnapshot = await adminDb
+      mindmapsSnapshot = await db
         .collection(FIRESTORE_COLLECTIONS.sessions)
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
@@ -45,7 +52,7 @@ export async function POST(request: NextRequest) {
       // Fallback: Get all and filter if index missing
       console.warn('[Tokens by Source] Missing index for mindmaps.createdAt query, using fallback')
       try {
-        const allMindmaps = await adminDb.collection(FIRESTORE_COLLECTIONS.sessions).get()
+        const allMindmaps = await db.collection(FIRESTORE_COLLECTIONS.sessions).get()
         mindmapsSnapshot = {
           docs: allMindmaps.docs.filter((doc) => {
             const createdAt = toDate(doc.data().createdAt)
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
       
       // Get tokens from associated processing jobs
       try {
-        const jobsSnapshot = await adminDb
+        const jobsSnapshot = await db
           .collection(FIRESTORE_COLLECTIONS.aiJobs)
           .where('mindmapId', '==', mindmapDoc.id)
           .get()
