@@ -13,7 +13,7 @@
  * 3. No Firebase functions are called in handleAuthSuccess
  */
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn, signInWithGoogle, getCurrentUser, checkMFARequired, getIdToken, getMFAStatus } from "@/lib/auth/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button"
 import { ErrorState } from "@/components/ui/error-state"
 import { LoadingState } from "@/components/ui/loading-state"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
@@ -288,6 +288,22 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <LoadingState variant="page" message="Loading..." />
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
 
