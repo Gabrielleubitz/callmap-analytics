@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
-import * as admin from 'firebase-admin'
+import { paginationParamsSchema } from '@/lib/schemas'
+import { paginatedResponse, errorResponse, validationError } from '@/lib/utils/api-response'
+import { toDate } from '@/lib/utils/date'
+import { FIRESTORE_COLLECTIONS } from '@/lib/config'
+import { Team } from '@/lib/types'
 
-function toDate(dateOrTimestamp: any): Date {
-  if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
-  if (dateOrTimestamp instanceof Date) return dateOrTimestamp
-  if (typeof dateOrTimestamp === 'string') return new Date(dateOrTimestamp)
-  return new Date()
-}
-
+/**
+ * Teams List API
+ * 
+ * Returns paginated list of teams with optional filters.
+ * 
+ * Response shape: PaginatedResponse<Team>
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -17,25 +21,37 @@ export async function POST(request: NextRequest) {
     const search = body.search || ''
     const plan = body.plan
     const country = body.country
-    const subscriptionStatus = body.subscriptionStatus
+
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('[Teams] Firebase Admin DB not initialized')
+      return errorResponse('Firebase Admin not configured', 500)
+    }
+
+    // Validate pagination params
+    const paginationResult = paginationParamsSchema.safeParse({ page, pageSize })
+    if (!paginationResult.success) {
+      return validationError(paginationResult.error.errors)
+    }
 
     // Get all workspaces
     let workspacesSnapshot
     try {
-      workspacesSnapshot = await adminDb.collection('workspaces').get()
-    } catch (error) {
-      return NextResponse.json({ data: [], total: 0 })
+      workspacesSnapshot = await adminDb!.collection(FIRESTORE_COLLECTIONS.teams).get()
+    } catch (error: any) {
+      console.error('[Teams] Error fetching workspaces:', error)
+      return errorResponse('Failed to fetch teams', 500, error.message)
     }
 
     // Filter and transform data
-    let allTeams = workspacesSnapshot.docs.map((doc) => {
+    let allTeams: Team[] = workspacesSnapshot.docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
         name: data.name || '',
         slug: data.slug || doc.id,
         plan: (data.plan || 'free') as any,
-        created_at: toDate(data.createdAt),
+        created_at: toDate(data.createdAt) || new Date(),
         owner_user_id: data.ownerUserId || data.ownerId || '',
         country: data.country || null,
         is_active: data.isActive !== false,
@@ -61,18 +77,15 @@ export async function POST(request: NextRequest) {
       allTeams = allTeams.filter((team) => team.country && country.includes(team.country))
     }
 
-    // Note: subscriptionStatus would need to be checked against subscriptions collection
-    // For now, we'll skip this filter or implement it if subscriptions collection exists
-
     const total = allTeams.length
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
     const paginatedTeams = allTeams.slice(startIndex, endIndex)
 
-    return NextResponse.json({ data: paginatedTeams, total })
+    return paginatedResponse(paginatedTeams, total, page, pageSize)
   } catch (error: any) {
-    console.error('Error fetching teams:', error)
-    return NextResponse.json({ data: [], total: 0 })
+    console.error('[Teams] Unexpected error:', error)
+    return errorResponse('Failed to fetch teams', 500, error.message)
   }
 }
 

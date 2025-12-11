@@ -1,53 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
-import * as admin from 'firebase-admin'
+import { dateRangeSchema } from '@/lib/schemas'
+import { extractTokenUsageFromJob } from '@/lib/utils/tokens'
+import { toDate, toFirestoreTimestamp } from '@/lib/utils/date'
+import { FIRESTORE_COLLECTIONS } from '@/lib/config'
 
-function toDate(dateOrTimestamp: any): Date {
-  if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
-  if (dateOrTimestamp instanceof Date) return dateOrTimestamp
-  if (typeof dateOrTimestamp === 'string') return new Date(dateOrTimestamp)
-  return new Date()
-}
-
+/**
+ * Most Expensive Sessions API
+ * 
+ * Returns the top N sessions by cost within a date range.
+ * 
+ * Formula: Group processingJobs by sessionId (mindmapId), sum costUsd per session, sort by cost descending
+ * Fields: processingJobs.mindmapId (or sessionId/documentId), processingJobs.costUsd, processingJobs.createdAt
+ * 
+ * Note: Sessions are identified by mindmapId in processingJobs. Multiple jobs can belong to one session.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const start = new Date(body.start)
-    const end = new Date(body.end)
+    
+    // Validate date range
+    const dateRangeResult = dateRangeSchema.safeParse(body)
+    if (!dateRangeResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid date range', details: dateRangeResult.error.errors },
+        { status: 400 }
+      )
+    }
+    
+    const { start, end } = dateRangeResult.data
     const limit = body.limit || 10
-    const startTimestamp = admin.firestore.Timestamp.fromDate(start)
-    const endTimestamp = admin.firestore.Timestamp.fromDate(end)
+    const startTimestamp = toFirestoreTimestamp(start)
+    const endTimestamp = toFirestoreTimestamp(end)
 
     // Get processing jobs in range
     let jobsSnapshot
     try {
       jobsSnapshot = await adminDb
-        .collection('processingJobs')
+        .collection(FIRESTORE_COLLECTIONS.aiJobs)
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
         .get()
     } catch (error) {
-      // If query fails, get all and filter
-      const allJobs = await adminDb.collection('processingJobs').get()
+      // Fallback: Get all and filter if index missing
+      console.warn('[Expensive Sessions] Missing index for processingJobs.createdAt query, using fallback')
+      const allJobs = await adminDb.collection(FIRESTORE_COLLECTIONS.aiJobs).get()
       jobsSnapshot = {
         docs: allJobs.docs.filter((doc) => {
-          const data = doc.data()
-          const createdAt = data.createdAt?.toDate?.() || data.createdAt
+          const createdAt = toDate(doc.data().createdAt)
           return createdAt && createdAt >= start && createdAt <= end
         }),
       } as any
     }
 
     // Group by session/mindmap and calculate total cost
-    const sessionCosts = new Map<string, any>()
+    // Formula: Sum costUsd for all jobs with the same mindmapId
+    const sessionCosts = new Map<string, {
+      id: string
+      source_type: string
+      tokens_in: number
+      tokens_out: number
+      cost_usd: number
+    }>()
 
-    jobsSnapshot.forEach((doc) => {
+    for (const doc of jobsSnapshot.docs) {
       const data = doc.data()
       const sessionId = data.mindmapId || data.sessionId || data.documentId || doc.id
-      const cost = data.costUsd || data.cost || 0
-      const tokensIn = data.tokensIn || 0
-      const tokensOut = data.tokensOut || 0
       const sourceType = data.sourceType || 'upload'
+      
+      // Extract token usage using shared utility
+      const usage = extractTokenUsageFromJob(data)
 
       if (!sessionCosts.has(sessionId)) {
         sessionCosts.set(sessionId, {
@@ -60,20 +82,23 @@ export async function POST(request: NextRequest) {
       }
 
       const session = sessionCosts.get(sessionId)!
-      session.tokens_in += tokensIn
-      session.tokens_out += tokensOut
-      session.cost_usd += cost
-    })
+      session.tokens_in += usage.tokensIn
+      session.tokens_out += usage.tokensOut
+      session.cost_usd += usage.cost
+    }
 
-    // Sort by cost and take top N
+    // Sort by cost descending and take top N
     const result = Array.from(sessionCosts.values())
       .sort((a, b) => b.cost_usd - a.cost_usd)
       .slice(0, limit)
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Error fetching expensive sessions:', error)
-    return NextResponse.json([])
+    console.error('[Expensive Sessions] Error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch expensive sessions' },
+      { status: 500 }
+    )
   }
 }
 

@@ -1,108 +1,118 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
-import * as admin from 'firebase-admin'
+import { dateRangeSchema, usageMetricsSchema } from '@/lib/schemas'
+import { getTokenUsageFromJobs } from '@/lib/utils/tokens'
+import { toDate, toFirestoreTimestamp } from '@/lib/utils/date'
+import { calculateAvgTokensPerSession } from '@/lib/utils/metrics'
+import { FIRESTORE_COLLECTIONS } from '@/lib/config'
+import { metricResponse, errorResponse, validationError } from '@/lib/utils/api-response'
 
+/**
+ * Usage Metrics API
+ * 
+ * Calculates token and cost metrics for the usage page:
+ * - totalTokensIn: Sum of tokensIn from processingJobs within date range
+ * - totalTokensOut: Sum of tokensOut from processingJobs within date range
+ * - totalCost: Sum of costUsd from processingJobs within date range
+ * - tokensByModel: Grouped tokens by model
+ * - avgTokensPerSession: (totalTokensIn + totalTokensOut) / sessionCount
+ * 
+ * Data sources:
+ * - Tokens/Cost: processingJobs collection (PRIMARY source of truth)
+ * - Sessions: mindmaps collection (for session count)
+ * 
+ * Formula consistency:
+ * - Uses getTokenUsageFromJobs() from lib/utils/tokens.ts
+ * - Uses calculateAvgTokensPerSession() from lib/utils/metrics.ts
+ * - All token calculations use the same utilities to prevent drift
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const start = new Date(body.start)
-    const end = new Date(body.end)
-    const startTimestamp = admin.firestore.Timestamp.fromDate(start)
-    const endTimestamp = admin.firestore.Timestamp.fromDate(end)
-
-    let totalTokensIn = 0
-    let totalTokensOut = 0
-    let totalCost = 0
-    const modelMap = new Map<string, number>()
-    let sessionCount = 0
-
-    // Try to get from usage collection first
-    try {
-      const usageSnapshot = await adminDb.collection('usage').get()
-      for (const userDoc of usageSnapshot.docs) {
-        const monthsSnapshot = await userDoc.ref.collection('months').get()
-        monthsSnapshot.forEach((monthDoc) => {
-          const data = monthDoc.data()
-          const monthDate = new Date(data.month + '-01')
-          if (monthDate >= start && monthDate <= end) {
-            const tokensIn = data.promptTokens || 0
-            const tokensOut = data.completionTokens || 0
-            totalTokensIn += tokensIn
-            totalTokensOut += tokensOut
-            const model = data.model || 'unknown'
-            modelMap.set(model, (modelMap.get(model) || 0) + tokensIn + tokensOut)
-          }
-        })
-      }
-    } catch (error) {
-      // Fallback to processingJobs
-      try {
-        const jobsSnapshot = await adminDb
-          .collection('processingJobs')
-          .where('createdAt', '>=', startTimestamp)
-          .where('createdAt', '<=', endTimestamp)
-          .get()
-
-        jobsSnapshot.forEach((doc) => {
-          const data = doc.data()
-          const tokensIn = data.tokensIn || 0
-          const tokensOut = data.tokensOut || 0
-          totalTokensIn += tokensIn
-          totalTokensOut += tokensOut
-          totalCost += data.costUsd || data.cost || 0
-          const model = data.model || 'unknown'
-          modelMap.set(model, (modelMap.get(model) || 0) + tokensIn + tokensOut)
-        })
-      } catch (jobsError) {
-        console.warn('Could not fetch usage metrics:', jobsError)
-      }
+    
+    // Validate date range
+    const dateRangeResult = dateRangeSchema.safeParse(body)
+    if (!dateRangeResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid date range', details: dateRangeResult.error.errors },
+        { status: 400 }
+      )
     }
+    
+    const { start, end } = dateRangeResult.data
 
-    // Get session count
+    // KPI 1-3: Token Usage (using shared utility)
+    // Formula: Sum from processingJobs.tokensIn, processingJobs.tokensOut, processingJobs.costUsd
+    // Fields: processingJobs.createdAt (filtered by date range)
+    const tokenUsage = await getTokenUsageFromJobs(start, end)
+
+    // KPI 4: Session Count
+    // Formula: Count of mindmaps where createdAt is within date range
+    // Field: mindmaps.createdAt
+    let sessionCount = 0
     try {
+      const startTimestamp = toFirestoreTimestamp(start)
+      const endTimestamp = toFirestoreTimestamp(end)
       const mindmapsSnapshot = await adminDb
-        .collection('mindmaps')
+        .collection(FIRESTORE_COLLECTIONS.sessions)
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
         .get()
       sessionCount = mindmapsSnapshot.size
     } catch (error) {
-      // If query fails, try getting all and filtering
+      // Fallback: Get all and filter client-side if index missing
+      console.warn('[Usage Metrics] Missing index for mindmaps.createdAt query, using fallback')
       try {
-        const allMindmaps = await adminDb.collection('mindmaps').get()
+        const allMindmaps = await adminDb.collection(FIRESTORE_COLLECTIONS.sessions).get()
         sessionCount = allMindmaps.docs.filter((doc) => {
-          const data = doc.data()
-          const createdAt = data.createdAt?.toDate?.() || data.createdAt
+          const createdAt = toDate(doc.data().createdAt)
           return createdAt && createdAt >= start && createdAt <= end
         }).length
       } catch (e) {
-        // Ignore
+        console.error('[Usage Metrics] Could not fetch session count:', e)
       }
     }
 
-    const tokensByModel = Array.from(modelMap.entries()).map(([model, tokens]) => ({
+    // KPI 5: Average Tokens Per Session
+    // Formula: (totalTokensIn + totalTokensOut) / sessionCount
+    // Uses: calculateAvgTokensPerSession() from lib/utils/metrics.ts
+    const avgTokensPerSession = calculateAvgTokensPerSession(
+      tokenUsage.totalTokens,
+      sessionCount
+    )
+
+    // Transform model map to array
+    const tokensByModel = Array.from(tokenUsage.byModel.entries()).map(([model, tokens]) => ({
       model,
       tokens,
     }))
 
-    const avgTokensPerSession = sessionCount > 0 ? (totalTokensIn + totalTokensOut) / sessionCount : 0
-
-    return NextResponse.json({
-      totalTokensIn,
-      totalTokensOut,
+    const result = {
+      totalTokensIn: tokenUsage.tokensIn,
+      totalTokensOut: tokenUsage.tokensOut,
       tokensByModel,
       avgTokensPerSession,
-      totalCost,
+      totalCost: tokenUsage.cost,
+    }
+
+    // Validate response shape
+    const validatedResult = usageMetricsSchema.parse(result)
+
+    return metricResponse(validatedResult, {
+      dateRange: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
     })
   } catch (error: any) {
-    console.error('Error fetching usage metrics:', error)
-    return NextResponse.json({
-      totalTokensIn: 0,
-      totalTokensOut: 0,
-      tokensByModel: [],
-      avgTokensPerSession: 0,
-      totalCost: 0,
-    })
+    console.error('[Usage Metrics] Error:', error)
+    
+    if (error.name === 'ZodError') {
+      return errorResponse('Data validation failed', 500, error.errors, 'VALIDATION_ERROR')
+    }
+    
+    return errorResponse(error.message || 'Failed to fetch usage metrics', 500, error.message)
   }
 }
 

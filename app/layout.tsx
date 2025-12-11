@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Outfit } from "next/font/google"
 import "./globals.css"
-import { Nav } from "@/components/layout/nav"
+import { ConditionalNav } from "@/components/layout/conditional-nav"
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -21,9 +21,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={outfit.variable}>
-      <body className={outfit.className}>
-        <Nav />
+    <html lang="en" className={outfit.variable} suppressHydrationWarning>
+      <body className={outfit.className} suppressHydrationWarning>
+        <ConditionalNav />
         <main className="min-h-screen bg-gray-50">
           {children}
         </main>

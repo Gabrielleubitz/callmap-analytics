@@ -1,18 +1,21 @@
 "use client"
 
+/**
+ * Data Explorer Page - Improved
+ * 
+ * Consistent styling with rest of the app:
+ * - Better loading/error/empty states
+ * - Consistent table styling
+ * - Improved layout
+ */
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Select } from "@/components/ui/select"
+import { LoadingState } from "@/components/ui/loading-state"
+import { ErrorState } from "@/components/ui/error-state"
+import { EmptyState } from "@/components/ui/empty-state"
 import { getTableRows, TABLE_NAMES, TableName } from "@/lib/db"
 import { formatDate } from "@/lib/utils"
 
@@ -104,56 +107,67 @@ export default function DataExplorerPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-8 text-center text-gray-500">Loading...</div>
+                <LoadingState variant="table" />
               ) : data.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">No data found</div>
+                <EmptyState
+                  title="No data found"
+                  description={search
+                    ? `No rows match "${search}" in ${selectedTable}. Try a different search term.`
+                    : `No data found in ${selectedTable}.`}
+                />
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
                           {columns.map((col) => (
-                            <TableHead key={col}>{col}</TableHead>
+                            <th key={col} className="text-left py-2 px-2 font-medium text-gray-700">
+                              {col}
+                            </th>
                           ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                        </tr>
+                      </thead>
+                      <tbody>
                         {data.map((row, idx) => (
-                          <TableRow
+                          <tr
                             key={row.id || idx}
-                            className="cursor-pointer"
+                            className="border-b hover:bg-gray-50 cursor-pointer"
                             onClick={() => setSelectedRow(row)}
                           >
                             {columns.map((col) => {
                               const value = row[col]
                               if (value === null || value === undefined) {
-                                return <TableCell key={col}>-</TableCell>
+                                return (
+                                  <td key={col} className="py-2 px-2 text-gray-400">
+                                    -
+                                  </td>
+                                )
                               }
                               if (value instanceof Date || (typeof value === "string" && value.match(/^\d{4}-\d{2}-\d{2}/))) {
                                 return (
-                                  <TableCell key={col} className="text-xs">
+                                  <td key={col} className="py-2 px-2 text-xs">
                                     {formatDate(value)}
-                                  </TableCell>
+                                  </td>
                                 )
                               }
                               if (typeof value === "object") {
                                 return (
-                                  <TableCell key={col} className="font-mono text-xs">
+                                  <td key={col} className="py-2 px-2 font-mono text-xs">
                                     {JSON.stringify(value).slice(0, 50)}...
-                                  </TableCell>
+                                  </td>
                                 )
                               }
                               return (
-                                <TableCell key={col} className="text-xs">
+                                <td key={col} className="py-2 px-2 text-xs">
                                   {String(value).slice(0, 100)}
-                                </TableCell>
+                                </td>
                               )
                             })}
-                          </TableRow>
+                          </tr>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </tbody>
+                    </table>
                   </div>
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-sm text-gray-600">

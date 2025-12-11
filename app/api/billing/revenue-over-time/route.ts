@@ -1,59 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { dateRangeSchema } from '@/lib/schemas'
+import { calculateDailyRevenue } from '@/lib/utils/billing'
 
-function toDate(dateOrTimestamp: any): Date {
-  if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
-  if (dateOrTimestamp instanceof Date) return dateOrTimestamp
-  if (typeof dateOrTimestamp === 'string') return new Date(dateOrTimestamp)
-  return new Date()
-}
-
+/**
+ * Revenue Over Time API
+ * 
+ * Returns daily revenue totals within a date range.
+ * 
+ * Formula: Sum of payments/invoices grouped by date (YYYY-MM-DD)
+ * Fields: payments.amountUsd, payments.createdAt OR invoices.amountUsd, invoices.paidAt
+ * 
+ * Uses: calculateDailyRevenue() from lib/utils/billing.ts for consistency
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const start = new Date(body.start)
-    const end = new Date(body.end)
-
-    const dailyRevenue = new Map<string, number>()
-
-    // Get payments
-    try {
-      const paymentsSnapshot = await adminDb.collection('payments').get()
-      paymentsSnapshot.forEach((doc) => {
-        const data = doc.data()
-        const createdAt = toDate(data.createdAt)
-        if (createdAt >= start && createdAt <= end) {
-          const dateKey = createdAt.toISOString().split('T')[0]
-          const amount = data.amountUsd || data.amount_usd || 0
-          dailyRevenue.set(dateKey, (dailyRevenue.get(dateKey) || 0) + amount)
-        }
-      })
-    } catch (error) {
-      // If payments collection doesn't exist, try invoices
-      try {
-        const invoicesSnapshot = await adminDb.collection('invoices').get()
-        invoicesSnapshot.forEach((doc) => {
-          const data = doc.data()
-          const paidAt = toDate(data.paidAt || data.paid_at)
-          if (paidAt && paidAt >= start && paidAt <= end) {
-            const dateKey = paidAt.toISOString().split('T')[0]
-            const amount = data.amountUsd || data.amount_usd || 0
-            dailyRevenue.set(dateKey, (dailyRevenue.get(dateKey) || 0) + amount)
-          }
-        })
-      } catch (invoicesError) {
-        // Ignore
-      }
+    
+    // Validate date range
+    const dateRangeResult = dateRangeSchema.safeParse(body)
+    if (!dateRangeResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid date range', details: dateRangeResult.error.errors },
+        { status: 400 }
+      )
     }
+    
+    const { start, end } = dateRangeResult.data
 
+    // Get daily revenue using shared utility
+    const dailyRevenue = await calculateDailyRevenue(start, end)
+
+    // Transform to array and sort
     const result = Array.from(dailyRevenue.entries())
       .map(([date, revenue]) => ({ date, revenue }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Error fetching revenue over time:', error)
-    return NextResponse.json([])
+    console.error('[Revenue Over Time] Error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch revenue over time' },
+      { status: 500 }
+    )
   }
 }
 

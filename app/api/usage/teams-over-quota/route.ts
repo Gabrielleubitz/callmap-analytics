@@ -1,69 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { getPlanQuota, FIRESTORE_COLLECTIONS } from '@/lib/config'
+import { Plan } from '@/lib/types'
+import { getTeamCurrentMonthUsage } from '@/lib/utils/tokens'
+import { calculateQuotaPercentage } from '@/lib/utils/metrics'
 
+/**
+ * Teams Over Quota API
+ * 
+ * Returns teams that are using 80% or more of their monthly token quota.
+ * 
+ * Formula:
+ * - quota = PLAN_QUOTAS[team.plan] from lib/config.ts
+ * - used = Sum of tokens from processingJobs for current month where workspaceId matches
+ * - percentage = (used / quota) * 100
+ * 
+ * Fields:
+ * - workspaces.plan (for quota lookup)
+ * - processingJobs.workspaceId, processingJobs.tokensIn, processingJobs.tokensOut, processingJobs.createdAt
+ * 
+ * Uses:
+ * - getPlanQuota() from lib/config.ts
+ * - getTeamCurrentMonthUsage() from lib/utils/tokens.ts
+ * - calculateQuotaPercentage() from lib/utils/metrics.ts
+ */
 export async function POST(request: NextRequest) {
   try {
     // Get all workspaces
-    const workspacesSnapshot = await adminDb.collection('workspaces').get()
+    const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
     const result: Array<{ team_id: string; team_name: string; quota: number; used: number; percentage: number }> = []
-
-    // Get current month usage
-    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
 
     for (const workspaceDoc of workspacesSnapshot.docs) {
       const workspaceData = workspaceDoc.data()
-      const plan = workspaceData.plan || 'free'
+      const plan = (workspaceData.plan || 'free') as Plan
       
-      // Define quotas by plan
-      const quotas: Record<string, number> = {
-        free: 10000,
-        pro: 100000,
-        team: 500000,
-        enterprise: 10000000,
-      }
+      // Get quota from config (ensures consistency)
+      const quota = getPlanQuota(plan)
       
-      const quota = quotas[plan] || 10000
-      
-      // Get usage for this workspace
+      // Get current month usage using shared utility
+      // Formula: Sum tokens from processingJobs for this team in current month
       let used = 0
       try {
-        // Try to get from usage collection
-        const usageSnapshot = await adminDb.collection('usage').get()
-        for (const userDoc of usageSnapshot.docs) {
-          const userData = userDoc.data()
-          if (userData.workspaceId === workspaceDoc.id || userData.teamId === workspaceDoc.id) {
-            const monthsSnapshot = await userDoc.ref.collection('months').get()
-            monthsSnapshot.forEach((monthDoc) => {
-              const monthData = monthDoc.data()
-              if (monthData.month === currentMonth) {
-                used += (monthData.promptTokens || 0) + (monthData.completionTokens || 0)
-              }
-            })
-          }
-        }
+        used = await getTeamCurrentMonthUsage(workspaceDoc.id)
       } catch (error) {
-        // If usage collection doesn't work, try processingJobs
-        try {
-          const jobsSnapshot = await adminDb
-            .collection('processingJobs')
-            .where('workspaceId', '==', workspaceDoc.id)
-            .get()
-          
-          jobsSnapshot.forEach((jobDoc) => {
-            const jobData = jobDoc.data()
-            const createdAt = jobData.createdAt?.toDate?.() || jobData.createdAt
-            if (createdAt && createdAt.toISOString().slice(0, 7) === currentMonth) {
-              used += (jobData.tokensIn || 0) + (jobData.tokensOut || 0)
-            }
-          })
-        } catch (jobsError) {
-          // Ignore
-        }
+        console.warn(`[Teams Over Quota] Could not fetch usage for team ${workspaceDoc.id}:`, error)
+        // Continue with used = 0
       }
 
-      const percentage = quota > 0 ? (used / quota) * 100 : 0
+      // Calculate percentage using shared utility
+      const percentage = calculateQuotaPercentage(used, quota)
 
-      // Only include teams over 80% of quota
+      // Only include teams at 80% or more of quota
       if (percentage >= 80) {
         result.push({
           team_id: workspaceDoc.id,
@@ -80,8 +67,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Error fetching teams over quota:', error)
-    return NextResponse.json([])
+    console.error('[Teams Over Quota] Error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch teams over quota' },
+      { status: 500 }
+    )
   }
 }
 

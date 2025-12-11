@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { LogoutButton } from "@/components/auth/logout-button"
 
 const navItems = [
   { href: "/", label: "Overview" },
@@ -12,6 +13,8 @@ const navItems = [
   { href: "/billing", label: "Billing" },
   { href: "/ops", label: "Ops" },
   { href: "/explorer", label: "Data Explorer" },
+  { href: "/journeys", label: "Journeys" },
+  { href: "/diagnostics", label: "Diagnostics" },
   { href: "/settings", label: "Settings" },
 ]
 
@@ -45,6 +48,9 @@ export function Nav() {
                 )
               })}
             </div>
+          </div>
+          <div className="flex items-center">
+            <LogoutButton />
           </div>
         </div>
       </div>

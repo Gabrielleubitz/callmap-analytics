@@ -1,9 +1,27 @@
-// Database types and functions
-// These fetch data from Next.js API routes (which use Firebase Admin SDK)
+/**
+ * Database functions for Callmap Analytics
+ * 
+ * Data Flow:
+ * 1. Frontend pages call functions from this file (lib/db.ts)
+ * 2. These functions make HTTP requests to Next.js API routes (/app/api/**)
+ * 3. API routes use Firebase Admin SDK to query Firestore directly
+ * 4. API routes return validated, typed data
+ * 5. Frontend receives and displays the data
+ * 
+ * This architecture:
+ * - Avoids CORS issues (same-origin API routes)
+ * - Keeps Firebase credentials server-side only
+ * - Allows server-side validation and transformation
+ * - Provides consistent error handling
+ */
 
 // Use Next.js API routes (server-side, no CORS issues)
 const API_BASE = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
 
+/**
+ * Make an API request and return the response
+ * Handles standardized response shapes (PaginatedResponse, MetricResponse, ErrorResponse)
+ */
 async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -15,235 +33,83 @@ async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T
     })
     
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error(`[API] ${endpoint} failed:`, errorData)
       return null
     }
     
     return await response.json()
   } catch (error) {
+    console.error(`[API] ${endpoint} error:`, error)
     return null
   }
 }
 
-export type DateRange = {
-  start: Date
-  end: Date
+/**
+ * Extract data from MetricResponse<T>
+ * Returns the data field, or null if response is invalid
+ */
+function extractMetricData<T>(response: { data: T } | null): T | null {
+  return response?.data ?? null
 }
 
-export type Plan = 'free' | 'pro' | 'team' | 'enterprise'
-export type UserRole = 'owner' | 'admin' | 'member'
-export type UserStatus = 'active' | 'invited' | 'disabled'
-export type SessionSourceType = 'call' | 'meeting' | 'upload' | 'url'
-export type SessionStatus = 'queued' | 'processing' | 'ready' | 'failed'
-export type AIJobType = 'transcribe' | 'summarize' | 'map' | 'export'
-export type AIJobStatus = 'queued' | 'processing' | 'completed' | 'failed'
-export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled'
-export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void'
-export type CreditType = 'promo' | 'support' | 'manual'
-
-export interface Team {
-  id: string
-  name: string
-  slug: string
-  plan: Plan
-  created_at: Date
-  owner_user_id: string
-  country: string | null
-  is_active: boolean
+/**
+ * Extract items from PaginatedResponse<T>
+ * Returns { items, total } for backward compatibility
+ */
+function extractPaginatedData<T>(response: { items: T[]; total: number } | null): { data: T[]; total: number } {
+  if (!response) {
+    return { data: [], total: 0 }
+  }
+  return {
+    data: response.items || [],
+    total: response.total || 0,
+  }
 }
 
-export interface User {
-  id: string
-  team_id: string | null
-  email: string
-  name: string | null
-  role: UserRole
-  status: UserStatus
-  created_at: Date
-  last_login_at: Date | null
-  last_activity_at: Date | null
-}
-
-export interface TokenWallet {
-  id: string
-  team_id: string | null
-  user_id: string | null
-  monthly_quota_tokens: number
-  tokens_used_this_month: number
-  tokens_used_total: number
-  resets_at: Date
-}
-
-export interface Session {
-  id: string
-  team_id: string | null
-  user_id: string | null
-  source_type: SessionSourceType
-  status: SessionStatus
-  duration_seconds: number | null
-  chars_in: number | null
-  tokens_in: number | null
-  tokens_out: number | null
-  model: string | null
-  cost_usd: number | null
-  created_at: Date
-}
-
-export interface AIJob {
-  id: string
-  session_id: string | null
-  type: AIJobType
-  status: AIJobStatus
-  started_at: Date | null
-  finished_at: Date | null
-  tokens_in: number | null
-  tokens_out: number | null
-  cost_usd: number | null
-  error_message: string | null
-}
-
-export interface Subscription {
-  id: string
-  team_id: string
-  plan: Plan
-  provider: string
-  status: SubscriptionStatus
-  trial_end: Date | null
-  current_period_start: Date
-  current_period_end: Date
-  cancel_at: Date | null
-  canceled_at: Date | null
-}
-
-export interface Invoice {
-  id: string
-  team_id: string
-  amount_usd: number
-  status: InvoiceStatus
-  due_date: Date
-  paid_at: Date | null
-  period_start: Date
-  period_end: Date
-}
-
-export interface Payment {
-  id: string
-  team_id: string
-  amount_usd: number
-  provider: string
-  provider_charge_id: string | null
-  created_at: Date
-}
-
-export interface Credit {
-  id: string
-  team_id: string
-  type: CreditType
-  amount_usd: number
-  created_at: Date
-  expires_at: Date | null
-}
-
-export interface FeatureFlag {
-  id: string
-  key: string
-  description: string | null
-  is_enabled_default: boolean
-}
-
-export interface FeatureFlagOverride {
-  id: string
-  flag_id: string
-  team_id: string | null
-  user_id: string | null
-  is_enabled: boolean
-}
-
-export interface APIKey {
-  id: string
-  team_id: string
-  name: string
-  last_used_at: Date | null
-  created_at: Date
-  is_active: boolean
-}
-
-export interface WebhookEndpoint {
-  id: string
-  team_id: string
-  url: string
-  event_types: string[]
-  created_at: Date
-  last_success_at: Date | null
-  last_failure_at: Date | null
-  is_active: boolean
-}
-
-export interface WebhookLog {
-  id: string
-  endpoint_id: string
-  status_code: number | null
-  attempted_at: Date
-  latency_ms: number | null
-  error_message: string | null
-}
-
-export interface AuditLog {
-  id: string
-  team_id: string | null
-  user_id: string | null
-  action: string
-  entity_type: string
-  entity_id: string | null
-  metadata: Record<string, any> | null
-  created_at: Date
-}
-
-export interface OverviewMetrics {
-  total_users: number
-  active_users: number
-  new_registrations: number
-  active_teams: number
-  sessions: number
-  tokens_used: number
-  estimated_cost: number
-  mrr_estimate: number
-}
-
-export interface PaginationParams {
-  page: number
-  pageSize: number
-  sortBy?: string
-  sortOrder?: 'asc' | 'desc'
-}
-
-export interface TeamsParams extends PaginationParams {
-  plan?: Plan[]
-  country?: string[]
-  subscriptionStatus?: SubscriptionStatus[]
-  tokensUsedMin?: number
-  tokensUsedMax?: number
-  createdFrom?: Date
-  createdTo?: Date
-  search?: string
-}
-
-export interface UsersParams extends PaginationParams {
-  teamId?: string
-  role?: UserRole[]
-  status?: UserStatus[]
-  hasLoggedIn?: boolean
-  createdFrom?: Date
-  createdTo?: Date
-  activityFrom?: Date
-  activityTo?: Date
-  tokensUsedMin?: number
-  search?: string
-}
+// Re-export types from central types file
+export type {
+  DateRange,
+  Plan,
+  UserRole,
+  UserStatus,
+  SessionSourceType,
+  SessionStatus,
+  AIJobType,
+  AIJobStatus,
+  SubscriptionStatus,
+  InvoiceStatus,
+  CreditType,
+  Team,
+  User,
+  TokenWallet,
+  Session,
+  AIJob,
+  Subscription,
+  Invoice,
+  Payment,
+  Credit,
+  FeatureFlag,
+  FeatureFlagOverride,
+  APIKey,
+  WebhookEndpoint,
+  WebhookLog,
+  AuditLog,
+  OverviewMetrics,
+  UsageMetrics,
+  BillingMetrics,
+  AIJobStats,
+  PaginationParams,
+  TeamsParams,
+  UsersParams,
+  UserUpdatePayload,
+  PaginatedResponse,
+} from './types'
 
 // Database functions - fetch from Next.js API routes (server-side Firebase Admin)
 
 export async function getOverviewMetrics(range: DateRange): Promise<OverviewMetrics> {
-  const result = await apiRequest<OverviewMetrics>('/api/analytics/overview', {
+  const result = await apiRequest<{ data: OverviewMetrics }>('/api/analytics/overview', {
     method: 'POST',
     body: JSON.stringify({
       start: range.start.toISOString(),
@@ -251,8 +117,11 @@ export async function getOverviewMetrics(range: DateRange): Promise<OverviewMetr
     }),
   })
   
-  if (result) return result
+  // Extract data from MetricResponse shape
+  const metrics = extractMetricData(result)
+  if (metrics) return metrics
   
+  // Return default values if API call failed
   return {
     total_users: 0,
     active_users: 0,
@@ -350,11 +219,11 @@ export async function getRecentlyFailedAIJobs(limitCount: number = 10): Promise<
 }
 
 export async function getTeams(params: TeamsParams): Promise<{ data: Team[]; total: number }> {
-  const result = await apiRequest<{ data: Team[]; total: number }>('/api/teams', {
+  const result = await apiRequest<{ items: Team[]; total: number; page: number; pageSize: number }>('/api/teams', {
     method: 'POST',
     body: JSON.stringify(params),
   })
-  return result || { data: [], total: 0 }
+  return extractPaginatedData(result)
 }
 
 export async function getTeamDetail(teamId: string, range: DateRange): Promise<Team | null> {
@@ -431,11 +300,11 @@ export async function getTeamAuditLogs(teamId: string, params: PaginationParams)
 }
 
 export async function getUsers(params: UsersParams): Promise<{ data: User[]; total: number }> {
-  const result = await apiRequest<{ data: User[]; total: number }>('/api/users', {
+  const result = await apiRequest<{ items: User[]; total: number; page: number; pageSize: number }>('/api/users', {
     method: 'POST',
     body: JSON.stringify(params),
   })
-  return result || { data: [], total: 0 }
+  return extractPaginatedData(result)
 }
 
 export async function getUserDetail(userId: string): Promise<User | null> {
@@ -475,20 +344,20 @@ export async function getUsageMetrics(range: DateRange): Promise<{
   avgTokensPerSession: number
   totalCost: number
 }> {
-  const result = await apiRequest<{
+  const result = await apiRequest<{ data: {
     totalTokensIn: number
     totalTokensOut: number
     tokensByModel: Array<{ model: string; tokens: number }>
     avgTokensPerSession: number
     totalCost: number
-  }>('/api/usage/metrics', {
+  }; meta?: any }>('/api/usage/metrics', {
     method: 'POST',
     body: JSON.stringify({
       start: range.start.toISOString(),
       end: range.end.toISOString(),
     }),
   })
-  return result || {
+  return extractMetricData(result) || {
     totalTokensIn: 0,
     totalTokensOut: 0,
     tokensByModel: [],
@@ -557,19 +426,19 @@ export async function getBillingMetrics(range: DateRange): Promise<{
   unpaidInvoices: number
   payingTeams: number
 }> {
-  const result = await apiRequest<{
+  const result = await apiRequest<{ data: {
     mrr: number
     totalRevenue: number
     unpaidInvoices: number
     payingTeams: number
-  }>('/api/billing/metrics', {
+  }; meta?: any }>('/api/billing/metrics', {
     method: 'POST',
     body: JSON.stringify({
       start: range.start.toISOString(),
       end: range.end.toISOString(),
     }),
   })
-  return result || {
+  return extractMetricData(result) || {
     mrr: 0,
     totalRevenue: 0,
     unpaidInvoices: 0,
@@ -728,6 +597,431 @@ export async function getTableRows(
     }),
   })
   return result || { data: [], total: 0, columns: [] }
+}
+
+// New Analytics Metrics Functions
+
+export async function getMindmapGenerationTime(range: DateRange): Promise<{
+  totalMindmaps: number
+  avgGenerationTimeMs: number
+  medianGenerationTimeMs: number
+  p95GenerationTimeMs: number
+  minGenerationTimeMs: number
+  maxGenerationTimeMs: number
+  avgBySourceType: Record<string, number>
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalMindmaps: number
+    avgGenerationTimeMs: number
+    medianGenerationTimeMs: number
+    p95GenerationTimeMs: number
+    minGenerationTimeMs: number
+    maxGenerationTimeMs: number
+    avgBySourceType: Record<string, number>
+  } }>('/api/analytics/mindmap-generation-time', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getMindmapEditCount(range: DateRange): Promise<{
+  totalEdits: number
+  mindmapsWithEdits: number
+  avgEditsPerMindmap: number
+  maxEdits: number
+  byEditType: Record<string, number>
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalEdits: number
+    mindmapsWithEdits: number
+    avgEditsPerMindmap: number
+    maxEdits: number
+    byEditType: Record<string, number>
+  } }>('/api/analytics/mindmap-edit-count', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getFileConversionRate(range: DateRange): Promise<{
+  totalConversions: number
+  successfulConversions: number
+  failedConversions: number
+  successRate: number
+  byFileType: Record<string, { total: number; success: number; failed: number }>
+  topErrors: Array<{ error: string; count: number }>
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalConversions: number
+    successfulConversions: number
+    failedConversions: number
+    successRate: number
+    byFileType: Record<string, { total: number; success: number; failed: number }>
+    topErrors: Array<{ error: string; count: number }>
+  } }>('/api/analytics/file-conversion-rate', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getUserRetention(range: DateRange): Promise<{
+  totalUsers: number
+  activeUsersThisPeriod: number
+  weeklyRetention: Array<{
+    week: string
+    activeUsers: number
+    retainedUsers: number
+    newUsers: number
+    retentionRate: number
+  }>
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalUsers: number
+    activeUsersThisPeriod: number
+    weeklyRetention: Array<{
+      week: string
+      activeUsers: number
+      retainedUsers: number
+      newUsers: number
+      retentionRate: number
+    }>
+  } }>('/api/analytics/user-retention', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getMindmapFunnel(range: DateRange): Promise<{
+  stepCounts: Record<string, number>
+  uniqueUsersByStep: Record<string, number>
+  uniqueMindmapsByStep: Record<string, number>
+  conversionRates: {
+    uploadToProcess: number
+    processToGenerate: number
+    generateToView: number
+    viewToEdit: number
+    viewToExport: number
+  }
+} | null> {
+  const result = await apiRequest<{ data: {
+    stepCounts: Record<string, number>
+    uniqueUsersByStep: Record<string, number>
+    uniqueMindmapsByStep: Record<string, number>
+    conversionRates: {
+      uploadToProcess: number
+      processToGenerate: number
+      generateToView: number
+      viewToEdit: number
+      viewToExport: number
+    }
+  } }>('/api/analytics/mindmap-funnel', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getExportRate(range: DateRange): Promise<{
+  totalExports: number
+  successfulExports: number
+  failedExports: number
+  totalMindmaps: number
+  exportedMindmaps: number
+  exportRate: number
+  byExportType: Record<string, { total: number; success: number; failed: number }>
+  avgExportsPerMindmap: number
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalExports: number
+    successfulExports: number
+    failedExports: number
+    totalMindmaps: number
+    exportedMindmaps: number
+    exportRate: number
+    byExportType: Record<string, { total: number; success: number; failed: number }>
+    avgExportsPerMindmap: number
+  } }>('/api/analytics/export-rate', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getCollaborationActivity(range: DateRange): Promise<{
+  totalCollaborationEvents: number
+  byActivityType: Record<string, number>
+  byWorkspace: Record<string, number>
+  activeCollaborators: number
+  activeMindmaps: number
+  avgEventsPerMindmap: number
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalCollaborationEvents: number
+    byActivityType: Record<string, number>
+    byWorkspace: Record<string, number>
+    activeCollaborators: number
+    activeMindmaps: number
+    avgEventsPerMindmap: number
+  } }>('/api/analytics/collaboration-activity', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getTokenBurnByFeature(range: DateRange): Promise<{
+  totalTokens: number
+  totalEvents: number
+  avgTokensPerEvent: number
+  byFeature: Record<string, { total: number; count: number; avg: number }>
+  byFeaturePercent: Record<string, number>
+} | null> {
+  const result = await apiRequest<{ data: {
+    totalTokens: number
+    totalEvents: number
+    avgTokensPerEvent: number
+    byFeature: Record<string, { total: number; count: number; avg: number }>
+    byFeaturePercent: Record<string, number>
+  } }>('/api/analytics/token-burn-by-feature', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+// Map Economics
+
+export async function getMapEconomics(range: DateRange, filters?: {
+  plan?: string
+  teamId?: string
+}): Promise<{
+  teams: Array<{
+    teamId: string
+    teamName: string
+    plan: string
+    mrr: number
+    totalTokenCost: number
+    aiMargin: number
+    mindmapsCount: number
+    activeUsers: number
+    costPerMindmap: number
+    mapsPerActiveUser: number
+  }>
+  totals: {
+    mrr: number
+    tokenCost: number
+    aiMargin: number
+    mindmaps: number
+  }
+} | null> {
+  const result = await apiRequest<{ data: {
+    teams: Array<{
+      teamId: string
+      teamName: string
+      plan: string
+      mrr: number
+      totalTokenCost: number
+      aiMargin: number
+      mindmapsCount: number
+      activeUsers: number
+      costPerMindmap: number
+      mapsPerActiveUser: number
+    }>
+    totals: {
+      mrr: number
+      tokenCost: number
+      aiMargin: number
+      mindmaps: number
+    }
+  } }>('/api/analytics/map-economics', {
+    method: 'POST',
+    body: JSON.stringify({
+      dateFrom: range.start.toISOString(),
+      dateTo: range.end.toISOString(),
+      ...filters,
+    }),
+  })
+  return extractMetricData(result)
+}
+
+// Behavior Cohorts
+
+export async function getBehaviorCohorts(range: DateRange, maxWeeks?: number): Promise<{
+  cohorts: Array<{
+    cohortKey: 'EXPORTERS_WEEK1' | 'EDITORS_3PLUS_WEEK1' | 'ONE_AND_DONE' | 'COLLABORATORS_WEEK1'
+    size: number
+    weeks: Array<{
+      weekNumber: number
+      activeUsers: number
+      retentionRate: number
+    }>
+  }>
+  generatedAt: string
+} | null> {
+  const result = await apiRequest<{ data: {
+    cohorts: Array<{
+      cohortKey: 'EXPORTERS_WEEK1' | 'EDITORS_3PLUS_WEEK1' | 'ONE_AND_DONE' | 'COLLABORATORS_WEEK1'
+      size: number
+      weeks: Array<{
+        weekNumber: number
+        activeUsers: number
+        retentionRate: number
+      }>
+    }>
+    generatedAt: string
+  } }>('/api/analytics/behavior-cohorts', {
+    method: 'POST',
+    body: JSON.stringify({
+      dateFrom: range.start.toISOString(),
+      dateTo: range.end.toISOString(),
+      maxWeeks,
+    }),
+  })
+  return extractMetricData(result)
+}
+
+// Analytics Alerts
+
+export async function getAnalyticsAlerts(): Promise<{
+  alerts: Array<{
+    id: string
+    metric: string
+    severity: 'warning' | 'critical'
+    currentValue: number
+    expectedValue: number
+    deviation: number
+    message: string
+    timestamp: string
+  }>
+  count: number
+  criticalCount: number
+  warningCount: number
+} | null> {
+  const result = await apiRequest<{ data: {
+    alerts: Array<{
+      id: string
+      metric: string
+      severity: 'warning' | 'critical'
+      currentValue: number
+      expectedValue: number
+      deviation: number
+      message: string
+      timestamp: string
+    }>
+    count: number
+    criticalCount: number
+    warningCount: number
+  } }>('/api/analytics/alerts', {
+    method: 'GET',
+  })
+  return extractMetricData(result)
+}
+
+// Journey Explorer
+
+export async function getJourney(
+  entityType: 'user' | 'team',
+  entityId: string,
+  range: DateRange
+): Promise<{
+  events: Array<{
+    id: string
+    type: string
+    timestamp: string
+    description: string
+    metadata?: Record<string, any>
+  }>
+  count: number
+  entityType: string
+  entityId: string
+} | null> {
+  const result = await apiRequest<{ data: {
+    events: Array<{
+      id: string
+      type: string
+      timestamp: string
+      description: string
+      metadata?: Record<string, any>
+    }>
+    count: number
+    entityType: string
+    entityId: string
+  } }>('/api/analytics/journeys', {
+    method: 'POST',
+    body: JSON.stringify({
+      [entityType === 'user' ? 'userId' : 'teamId']: entityId,
+      dateFrom: range.start.toISOString(),
+      dateTo: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+/**
+ * Get wallet metrics
+ */
+export async function getWalletMetrics(
+  range: DateRange,
+  threshold?: number
+): Promise<{
+  dailyBreakdown: Array<{ date: string; credits: number; debits: number; net: number }>
+  totals: { credits: number; debits: number; net: number }
+  activeWallets: number
+  lowBalanceCount: number
+  threshold: number
+  uniqueUsers: number
+  generatedAt: string
+} | null> {
+  const result = await apiRequest<MetricResponse<{
+    dailyBreakdown: Array<{ date: string; credits: number; debits: number; net: number }>
+    totals: { credits: number; debits: number; net: number }
+    activeWallets: number
+    lowBalanceCount: number
+    threshold: number
+    uniqueUsers: number
+    generatedAt: string
+  }>>(
+    '/api/analytics/wallet-metrics',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        dateFrom: range.start.toISOString(),
+        dateTo: range.end.toISOString(),
+        threshold: threshold || 1000,
+      }),
+    }
+  )
+
+  if (!result) return null
+  return extractMetricData(result)
 }
 
 export const TABLE_NAMES = [

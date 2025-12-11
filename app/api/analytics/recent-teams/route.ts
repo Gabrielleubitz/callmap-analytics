@@ -10,19 +10,28 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('[Recent Teams] Firebase Admin DB not initialized')
+      return NextResponse.json(
+        { error: 'Firebase Admin not configured' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const limitCount = body.limit || 10
 
     let teamsSnapshot
     try {
-      teamsSnapshot = await adminDb
+      teamsSnapshot = await adminDb!
         .collection('workspaces')
         .orderBy('createdAt', 'desc')
         .limit(limitCount)
         .get()
     } catch (error: any) {
       // If index doesn't exist, get all and sort client-side
-      const allTeams = await adminDb.collection('workspaces').get()
+      const allTeams = await adminDb!.collection('workspaces').get()
       const sortedTeams = allTeams.docs
         .map((doc) => ({ doc, data: doc.data() }))
         .sort((a, b) => {
@@ -37,7 +46,7 @@ export async function POST(request: NextRequest) {
       } as any
     }
 
-    const result = teamsSnapshot.docs.map((doc) => {
+    const result = teamsSnapshot.docs.map((doc: any) => {
       const data = doc.data()
       return {
         id: doc.id,

@@ -33,6 +33,11 @@ export default function UserDetailPage() {
   const [sessions, setSessions] = useState<any[]>([])
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [featureFlags, setFeatureFlags] = useState<any[]>([])
+  const [walletTransactions, setWalletTransactions] = useState<any[]>([])
+  const [walletLoading, setWalletLoading] = useState(false)
+  const [adjustAmount, setAdjustAmount] = useState("")
+  const [adjustNote, setAdjustNote] = useState("")
+  const [isAdjusting, setIsAdjusting] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -47,6 +52,20 @@ export default function UserDetailPage() {
       setSessions(s.data)
       setAuditLogs(al.data)
       setFeatureFlags(ff)
+      
+      // Load wallet transactions
+      try {
+        setWalletLoading(true)
+        const response = await fetch(`/api/admin/wallet/${userId}/transactions?pageSize=5`)
+        if (response.ok) {
+          const data = await response.json()
+          setWalletTransactions(data.items || [])
+        }
+      } catch (error) {
+        console.error("Error loading wallet transactions:", error)
+      } finally {
+        setWalletLoading(false)
+      }
     }
     if (userId) load()
   }, [userId])
@@ -214,16 +233,8 @@ export default function UserDetailPage() {
 
             <div>
               <label className="text-sm font-medium text-gray-600">Token Balance</label>
-              {isEditing ? (
-                <Input
-                  value={displayUser.tokenBalance || 0}
-                  onChange={(e) => setEditingUser({ ...editingUser, tokenBalance: parseInt(e.target.value) || 0 })}
-                  className="mt-1"
-                  type="number"
-                />
-              ) : (
-                <div className="mt-1 text-lg font-bold">{formatNumber(displayUser.tokenBalance || 0)}</div>
-              )}
+              <div className="mt-1 text-lg font-bold">{formatNumber(displayUser.tokenBalance || 0)}</div>
+              <p className="text-xs text-gray-500 mt-1">Use Wallet panel below to adjust balance</p>
             </div>
 
             <div>
@@ -347,6 +358,140 @@ export default function UserDetailPage() {
               <div className="mt-1 text-lg">
                 {displayUser.updatedAt ? formatDate(displayUser.updatedAt) : '-'}
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Wallet Panel */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Wallet</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Current Balance */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Current Balance</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatNumber(user?.tokenBalance || 0)} tokens
+                </p>
+              </div>
+            </div>
+
+            {/* Adjust Balance Form */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Adjust Balance</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input
+                  type="number"
+                  placeholder="Amount (positive to add, negative to deduct)"
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                />
+                <Input
+                  type="text"
+                  placeholder="Note (e.g., 'Manual adjustment')"
+                  value={adjustNote}
+                  onChange={(e) => setAdjustNote(e.target.value)}
+                />
+                <Button
+                  onClick={async () => {
+                    const amount = parseInt(adjustAmount)
+                    if (!amount || amount === 0) {
+                      alert("Please enter a non-zero amount")
+                      return
+                    }
+                    setIsAdjusting(true)
+                    try {
+                      const response = await fetch(`/api/admin/wallet/${userId}/adjust`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          amount,
+                          note: adjustNote || "Manual adjustment by admin",
+                        }),
+                      })
+                      if (response.ok) {
+                        // Reload user and transactions
+                        const updatedUser = await getUserDetail(userId)
+                        setUser(updatedUser)
+                        setEditingUser(updatedUser ? { ...updatedUser } : null)
+                        setAdjustAmount("")
+                        setAdjustNote("")
+                        // Reload transactions
+                        const txResponse = await fetch(`/api/admin/wallet/${userId}/transactions?pageSize=5`)
+                        if (txResponse.ok) {
+                          const txData = await txResponse.json()
+                          setWalletTransactions(txData.items || [])
+                        }
+                      } else {
+                        const error = await response.json()
+                        alert(error.error || "Failed to adjust balance")
+                      }
+                    } catch (error) {
+                      console.error("Error adjusting balance:", error)
+                      alert("Error adjusting balance")
+                    } finally {
+                      setIsAdjusting(false)
+                    }
+                  }}
+                  disabled={isAdjusting || !adjustAmount}
+                >
+                  {isAdjusting ? "Adjusting..." : "Adjust Balance"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Recent Transactions</h3>
+              {walletLoading ? (
+                <div className="text-sm text-gray-500 py-4">Loading transactions...</div>
+              ) : walletTransactions.length === 0 ? (
+                <div className="text-sm text-gray-500 py-4">No transactions found</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Balance After</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {walletTransactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              tx.type === "credit"
+                                ? "default"
+                                : tx.type === "debit"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {tx.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
+                          {tx.amount > 0 ? "+" : ""}
+                          {formatNumber(tx.amount)}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">{tx.source}</TableCell>
+                        <TableCell className="font-medium">{formatNumber(tx.balanceAfter)}</TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {formatDate(tx.createdAt?.toDate?.() || tx.createdAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </div>
         </CardContent>

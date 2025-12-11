@@ -11,13 +11,22 @@ function toDate(dateOrTimestamp: any): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('[Recent Failed Jobs] Firebase Admin DB not initialized')
+      return NextResponse.json(
+        { error: 'Firebase Admin not configured' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const limitCount = body.limit || 10
 
     let jobsSnapshot
     try {
       // Try query with index
-      jobsSnapshot = await adminDb
+      jobsSnapshot = await adminDb!
         .collection('processingJobs')
         .where('status', '==', 'failed')
         .orderBy('createdAt', 'desc')
@@ -25,7 +34,7 @@ export async function POST(request: NextRequest) {
         .get()
     } catch (error: any) {
       // If index doesn't exist, get all and filter client-side
-      const allJobs = await adminDb
+      const allJobs = await adminDb!
         .collection('processingJobs')
         .orderBy('createdAt', 'desc')
         .limit(100) // Get more to filter
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
       } as any
     }
 
-    const result = jobsSnapshot.docs.map((doc) => {
+    const result = jobsSnapshot.docs.map((doc: any) => {
       const data = doc.data()
       return {
         id: doc.id,

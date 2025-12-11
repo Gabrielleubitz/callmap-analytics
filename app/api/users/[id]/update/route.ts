@@ -1,30 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { userUpdateSchema } from '@/lib/schemas'
+import { toFirestoreTimestamp } from '@/lib/utils/date'
 
+/**
+ * Update user data
+ * 
+ * Validates the request payload and updates only safe-to-edit fields.
+ * Rejects invalid plan names, roles, statuses, and ensures numeric fields are numbers.
+ */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const userId = params.id
     const body = await request.json()
 
-    // Build update object
-    const updateData: any = {}
+    // Validate payload with zod
+    const validationResult = userUpdateSchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid request data',
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        },
+        { status: 400 }
+      )
+    }
+
+    const validatedData = validationResult.data
+
+    // Build update object with only validated fields
+    const updateData: Record<string, any> = {}
     
-    if (body.name !== undefined) updateData.name = body.name
-    if (body.email !== undefined) updateData.email = body.email
-    if (body.role !== undefined) updateData.role = body.role
-    if (body.status !== undefined) updateData.status = body.status
-    if (body.plan !== undefined) updateData.plan = body.plan
-    if (body.onboarded !== undefined) updateData.onboarded = body.onboarded
-    if (body.tokenBalance !== undefined) updateData.tokenBalance = Number(body.tokenBalance)
-    if (body.audioMinutesUsed !== undefined) updateData.audioMinutesUsed = Number(body.audioMinutesUsed)
-    if (body.mapsGenerated !== undefined) updateData.mapsGenerated = Number(body.mapsGenerated)
-    if (body.monthlyResetTimestamp !== undefined) {
-      updateData.monthlyResetTimestamp = admin.firestore.Timestamp.fromDate(new Date(body.monthlyResetTimestamp))
+    if (validatedData.name !== undefined) updateData.name = validatedData.name
+    if (validatedData.email !== undefined) updateData.email = validatedData.email
+    if (validatedData.role !== undefined) updateData.role = validatedData.role
+    if (validatedData.status !== undefined) updateData.status = validatedData.status
+    if (validatedData.plan !== undefined) updateData.plan = validatedData.plan
+    if (validatedData.onboarded !== undefined) updateData.onboarded = validatedData.onboarded
+    if (validatedData.tokenBalance !== undefined) updateData.tokenBalance = validatedData.tokenBalance
+    if (validatedData.audioMinutesUsed !== undefined) updateData.audioMinutesUsed = validatedData.audioMinutesUsed
+    if (validatedData.mapsGenerated !== undefined) updateData.mapsGenerated = validatedData.mapsGenerated
+    if (validatedData.monthlyResetTimestamp !== undefined) {
+      updateData.monthlyResetTimestamp = toFirestoreTimestamp(new Date(validatedData.monthlyResetTimestamp))
     }
     
     // Always update updatedAt
     updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp()
+
+    // Check if user exists
+    const userDoc = await adminDb.collection('users').doc(userId).get()
+    if (!userDoc.exists) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
 
     // Update the user document
     await adminDb.collection('users').doc(userId).update(updateData)
@@ -32,6 +63,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error updating user:', error)
+    
+    // Handle Firestore errors
+    if (error.code === 'not-found') {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to update user' },
       { status: 500 }

@@ -11,6 +11,15 @@ function toDate(dateOrTimestamp: any): Date {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('[Daily Sessions] Firebase Admin DB not initialized')
+      return NextResponse.json(
+        { error: 'Firebase Admin not configured' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const start = new Date(body.start)
     const end = new Date(body.end)
@@ -20,14 +29,14 @@ export async function POST(request: NextRequest) {
     // Get mindmaps - handle case where index might not exist
     let mindmapsSnapshot
     try {
-      mindmapsSnapshot = await adminDb
+      mindmapsSnapshot = await adminDb!
         .collection('mindmaps')
         .where('createdAt', '>=', startTimestamp)
         .where('createdAt', '<=', endTimestamp)
         .get()
     } catch (error) {
       // If query fails, get all mindmaps and filter client-side
-      const allMindmaps = await adminDb.collection('mindmaps').get()
+      const allMindmaps = await adminDb!.collection('mindmaps').get()
       mindmapsSnapshot = {
         docs: allMindmaps.docs.filter((doc) => {
           const data = doc.data()
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const dailyData = new Map<string, number>()
-    mindmapsSnapshot.forEach((doc) => {
+    mindmapsSnapshot.forEach((doc: any) => {
       const data = doc.data()
       const createdDate = toDate(data.createdAt)
       const dateKey = createdDate.toISOString().split('T')[0]

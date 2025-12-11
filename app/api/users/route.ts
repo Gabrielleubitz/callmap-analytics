@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { paginationParamsSchema } from '@/lib/schemas'
+import { paginatedResponse, errorResponse, validationError } from '@/lib/utils/api-response'
+import { toDate } from '@/lib/utils/date'
+import { FIRESTORE_COLLECTIONS } from '@/lib/config'
+import { User } from '@/lib/types'
 
-function toDate(dateOrTimestamp: any): Date | null {
-  if (!dateOrTimestamp) return null
-  if (dateOrTimestamp?.toDate) return dateOrTimestamp.toDate()
-  if (dateOrTimestamp instanceof Date) return dateOrTimestamp
-  if (typeof dateOrTimestamp === 'string') return new Date(dateOrTimestamp)
-  return null
-}
-
+/**
+ * Users List API
+ * 
+ * Returns paginated list of users with optional filters.
+ * 
+ * Response shape: PaginatedResponse<User>
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -20,23 +24,30 @@ export async function POST(request: NextRequest) {
     const hasLoggedIn = body.hasLoggedIn
     const teamId = body.teamId
 
+    // Validate pagination params
+    const paginationResult = paginationParamsSchema.safeParse({ page, pageSize })
+    if (!paginationResult.success) {
+      return validationError(paginationResult.error.errors)
+    }
+
     // Get all users
     let usersSnapshot
     try {
-      usersSnapshot = await adminDb.collection('users').get()
-    } catch (error) {
-      return NextResponse.json({ data: [], total: 0 })
+      usersSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.users).get()
+    } catch (error: any) {
+      console.error('[Users] Error fetching users:', error)
+      return errorResponse('Failed to fetch users', 500, error.message)
     }
 
     // Get workspaces to map team IDs to names
-    const workspacesSnapshot = await adminDb.collection('workspaces').get()
+    const workspacesSnapshot = await adminDb.collection(FIRESTORE_COLLECTIONS.teams).get()
     const workspaceMap = new Map<string, string>()
     workspacesSnapshot.forEach((doc) => {
       workspaceMap.set(doc.id, doc.data().name || doc.id)
     })
 
     // Filter and transform data
-    let allUsers = usersSnapshot.docs.map((doc) => {
+    let allUsers: User[] = usersSnapshot.docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
@@ -87,10 +98,10 @@ export async function POST(request: NextRequest) {
     const endIndex = startIndex + pageSize
     const paginatedUsers = allUsers.slice(startIndex, endIndex)
 
-    return NextResponse.json({ data: paginatedUsers, total })
+    return paginatedResponse(paginatedUsers, total, page, pageSize)
   } catch (error: any) {
-    console.error('Error fetching users:', error)
-    return NextResponse.json({ data: [], total: 0 })
+    console.error('[Users] Unexpected error:', error)
+    return errorResponse('Failed to fetch users', 500, error.message)
   }
 }
 
