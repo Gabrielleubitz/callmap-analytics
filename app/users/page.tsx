@@ -9,7 +9,7 @@
  * 3. Collapsible details panel for each user
  */
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,9 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("")
   const [statusFilter, setStatusFilter] = useState<UserStatus | "">("")
   const [hasLoggedInFilter, setHasLoggedInFilter] = useState<"yes" | "no" | "">("")
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [adminUsers, setAdminUsers] = useState<Map<string, { isAdmin: boolean; role: string | null }>>(new Map())
+  const [loadingAdminStatus, setLoadingAdminStatus] = useState(true)
 
   // Build filters object
   const filters: Partial<UsersParams> = useMemo(() => {
@@ -56,6 +59,52 @@ export default function UsersPage() {
     pageSize,
     refetch,
   } = usePaginatedApi(fetcher, { page: 1, pageSize: 20 })
+
+  // Check if current user is superAdmin and fetch admin status for all users
+  useEffect(() => {
+    async function loadAdminStatus() {
+      try {
+        // Check current user's role
+        const sessionResponse = await fetch('/api/auth/session')
+        if (sessionResponse.ok) {
+          const sessionData = await sessionResponse.json()
+          if (sessionData.authenticated && sessionData.role === 'superAdmin') {
+            setIsSuperAdmin(true)
+          }
+        }
+
+        // Fetch admin status for all Firebase users
+        const adminResponse = await fetch('/api/admin/users')
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json()
+          const adminMap = new Map<string, { isAdmin: boolean; role: string | null }>()
+          adminData.users?.forEach((u: any) => {
+            adminMap.set(u.uid, { isAdmin: u.isAdmin, role: u.role })
+          })
+          setAdminUsers(adminMap)
+        }
+      } catch (error) {
+        console.error('Error loading admin status:', error)
+      } finally {
+        setLoadingAdminStatus(false)
+      }
+    }
+    loadAdminStatus()
+  }, [])
+
+  const handleAccessChange = () => {
+    // Reload admin status after access change
+    fetch('/api/admin/users')
+      .then(res => res.json())
+      .then(data => {
+        const adminMap = new Map<string, { isAdmin: boolean; role: string | null }>()
+        data.users?.forEach((u: any) => {
+          adminMap.set(u.uid, { isAdmin: u.isAdmin, role: u.role })
+        })
+        setAdminUsers(adminMap)
+      })
+      .catch(err => console.error('Error reloading admin status:', err))
+  }
 
   // Build active filter chips
   const activeFilters: FilterChip[] = useMemo(() => {
@@ -111,6 +160,7 @@ export default function UsersPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-3">User Management</h1>
         <p className="text-gray-600 text-sm max-w-3xl">
           View and manage all users in your platform. Search by name or email, filter by role (Owner, Admin, Member) or status (Active, Invited, Disabled). 
+          {isSuperAdmin && " As a super admin, you can grant or revoke analytics dashboard access by expanding any user card. "}
           Click on any user card to see detailed information including their activity, token balance, and session history.
         </p>
       </div>
@@ -211,25 +261,32 @@ export default function UsersPage() {
       ) : (
         <>
           <div className="space-y-4 mb-6">
-            {users.map((user) => (
-              <UserListCard
-                key={user.id}
-                user={{
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  team_id: user.team_id,
-                  role: user.role,
-                  status: user.status,
-                  created_at: user.created_at,
-                  last_login_at: user.last_login_at,
-                  last_activity_at: user.last_activity_at,
-                  tokenBalance: user.tokenBalance,
-                  audioMinutesUsed: user.audioMinutesUsed,
-                  mapsGenerated: user.mapsGenerated,
-                }}
-              />
-            ))}
+            {users.map((user) => {
+              const adminStatus = adminUsers.get(user.id) || { isAdmin: false, role: null }
+              return (
+                <UserListCard
+                  key={user.id}
+                  user={{
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    team_id: user.team_id,
+                    role: user.role,
+                    status: user.status,
+                    created_at: user.created_at,
+                    last_login_at: user.last_login_at,
+                    last_activity_at: user.last_activity_at,
+                    tokenBalance: user.tokenBalance,
+                    audioMinutesUsed: user.audioMinutesUsed,
+                    mapsGenerated: user.mapsGenerated,
+                  }}
+                  isAdmin={adminStatus.isAdmin}
+                  adminRole={adminStatus.role}
+                  isSuperAdmin={isSuperAdmin}
+                  onAccessChange={handleAccessChange}
+                />
+              )
+            })}
           </div>
 
           {/* Pagination */}
