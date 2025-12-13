@@ -89,16 +89,38 @@ export default function UserDetailPage() {
   }, [userId])
 
   const handleSave = async () => {
-    if (!editingUser) return
+    if (!editingUser || !user) return
     
     setIsSaving(true)
     try {
+      // Only send fields that are allowed in the update schema
+      // Filter out read-only fields like id, created_at, etc.
+      const updatePayload: Record<string, any> = {}
+      
+      // Only include fields that are different from the original user
+      if (editingUser.name !== user.name) updatePayload.name = editingUser.name
+      if (editingUser.email !== user.email) updatePayload.email = editingUser.email
+      if (editingUser.role !== user.role) updatePayload.role = editingUser.role
+      if (editingUser.status !== user.status) updatePayload.status = editingUser.status
+      if (editingUser.plan !== user.plan) updatePayload.plan = editingUser.plan
+      if (editingUser.onboarded !== user.onboarded) updatePayload.onboarded = editingUser.onboarded
+      if (editingUser.tokenBalance !== user.tokenBalance) updatePayload.tokenBalance = editingUser.tokenBalance
+      if (editingUser.audioMinutesUsed !== user.audioMinutesUsed) updatePayload.audioMinutesUsed = editingUser.audioMinutesUsed
+      if (editingUser.mapsGenerated !== user.mapsGenerated) updatePayload.mapsGenerated = editingUser.mapsGenerated
+      
+      // If no fields changed, just exit
+      if (Object.keys(updatePayload).length === 0) {
+        setIsEditing(false)
+        setIsSaving(false)
+        return
+      }
+      
       const response = await fetch(`/api/users/${userId}/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editingUser),
+        body: JSON.stringify(updatePayload),
       })
       
       if (response.ok) {
@@ -107,7 +129,9 @@ export default function UserDetailPage() {
         setEditingUser(updatedUser ? { ...updatedUser } : null)
         setIsEditing(false)
       } else {
-        alert('Failed to save changes')
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save changes' }))
+        alert(errorData.error || 'Failed to save changes')
+        console.error('Update error:', errorData)
       }
     } catch (error) {
       console.error('Error saving user:', error)
