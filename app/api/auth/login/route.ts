@@ -15,21 +15,44 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
-import { checkRateLimit } from '@/lib/auth/rate-limit'
+import { checkRateLimitKV, getClientIdentifier } from '@/lib/auth/rate-limit-kv'
+import Tokens from 'csrf'
 
 const SESSION_COOKIE_NAME = 'callmap_session'
 const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 5 // 5 days
+
+// SECURITY: Stricter rate limiting for login (3 attempts per 15 minutes)
+const LOGIN_RATE_LIMIT = {
+  maxRequests: 3,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting
-    const ip = request.headers.get('x-forwarded-for') || 
-              request.headers.get('x-real-ip') || 
-              'unknown'
+    // SECURITY: Distributed rate limiting with improved fingerprinting
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = await checkRateLimitKV(
+      `login:${clientId}`,
+      LOGIN_RATE_LIMIT.maxRequests,
+      LOGIN_RATE_LIMIT.windowMs,
+      request
+    )
     
-    if (checkRateLimit(`login:${ip}`, 5, 15 * 60 * 1000)) {
+    if (rateLimitResult.rateLimited) {
       return NextResponse.json(
-        { error: 'Too many login attempts. Please try again later.' },
-        { status: 429 }
+        { 
+          error: 'Too many login attempts. Please try again later.',
+          retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000),
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': LOGIN_RATE_LIMIT.maxRequests.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': rateLimitResult.resetTime.toString(),
+          },
+        }
       )
     }
 
@@ -60,8 +83,13 @@ export async function POST(request: NextRequest) {
     try {
       decodedToken = await adminAuth.verifyIdToken(idToken)
     } catch (error: any) {
+      // SECURITY: Don't expose internal error details in production
+      const errorMessage = process.env.NODE_ENV === 'production' 
+        ? 'Invalid credentials' 
+        : error.message
+      console.error('[Login] Token verification failed:', error.message)
       return NextResponse.json(
-        { error: 'Invalid ID token', details: error.message },
+        { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
@@ -100,9 +128,20 @@ export async function POST(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE_NAME, sessionCookie, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict', // SECURITY: Changed from 'lax' to 'strict' for better CSRF protection
       path: '/',
       maxAge: expiresIn / 1000, // Convert to seconds
+    })
+
+    // SECURITY: Set CSRF secret cookie for CSRF protection
+    const csrfTokens = new Tokens()
+    const csrfSecret = await csrfTokens.secret()
+    response.cookies.set('csrf_secret', csrfSecret, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: expiresIn / 1000, // Same as session cookie
     })
 
     return response

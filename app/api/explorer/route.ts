@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { verifySessionCookie } from '@/lib/auth/session'
+import { cookies } from 'next/headers'
+import * as admin from 'firebase-admin'
 
 const COLLECTION_MAP: Record<string, string> = {
   teams: 'workspaces',
@@ -19,19 +22,61 @@ const COLLECTION_MAP: Record<string, string> = {
   audit_logs: 'auditLogs',
 }
 
+// SECURITY: Only allow querying safe collections
+const ALLOWED_COLLECTIONS = Object.keys(COLLECTION_MAP)
+
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Verify session and check for superAdmin role
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('callmap_session')?.value
+
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let decodedToken
+    try {
+      decodedToken = await verifySessionCookie(sessionCookie)
+    } catch (error: any) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
+
+    // Only superAdmin can use explorer
+    if (decodedToken.role !== 'superAdmin') {
+      return NextResponse.json(
+        { error: 'Forbidden. SuperAdmin access required.' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const tableName = body.tableName
     const page = body.page || 1
     const pageSize = body.pageSize || 20
     const search = body.search || ''
 
+    // SECURITY: Validate and sanitize search input
+    if (search && typeof search === 'string' && search.length > 1000) {
+      return NextResponse.json(
+        { error: 'Search query too long' },
+        { status: 400 }
+      )
+    }
+
     if (!adminDb) {
       return NextResponse.json({ error: 'Firebase Admin not initialized' }, { status: 500 })
     }
 
-    const collectionName = COLLECTION_MAP[tableName] || tableName
+    // SECURITY: Only allow querying mapped collections
+    if (!tableName || !COLLECTION_MAP[tableName]) {
+      return NextResponse.json(
+        { error: 'Invalid table name' },
+        { status: 400 }
+      )
+    }
+
+    const collectionName = COLLECTION_MAP[tableName]
 
     // Get all documents
     let snapshot
@@ -65,6 +110,31 @@ export async function POST(request: NextRequest) {
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
     const paginatedRows = allRows.slice(startIndex, endIndex)
+
+    // SECURITY: Log audit trail for explorer queries
+    const auditLogRef = adminDb!.collection('auditLogs').doc()
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown'
+    
+    auditLogRef.set({
+      action: 'explorer_query',
+      adminUserId: decodedToken.uid,
+      adminEmail: decodedToken.email || null,
+      details: {
+        collection: collectionName,
+        tableName,
+        searchQuery: search || null,
+        page,
+        pageSize,
+        resultsCount: paginatedRows.length,
+      },
+      ipAddress: clientIp,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      userAgent: request.headers.get('user-agent') || null,
+    }).catch((error) => {
+      console.error('[explorer] Error logging audit:', error)
+    })
 
     return NextResponse.json({ data: paginatedRows, total, columns })
   } catch (error: any) {

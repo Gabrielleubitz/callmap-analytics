@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import { errorResponse, validationError } from '@/lib/utils/api-response'
+import { verifySessionCookie } from '@/lib/auth/session'
+import { validateCSRF } from '@/lib/middleware/csrf-middleware'
+import { cookies } from 'next/headers'
 import { z } from 'zod'
 import * as admin from 'firebase-admin'
 
@@ -20,6 +23,37 @@ export async function POST(
   { params }: { params: { userId: string } }
 ) {
   try {
+    // SECURITY: Validate CSRF token (optional, can be disabled via env var)
+    if (process.env.ENABLE_CSRF_PROTECTION !== 'false') {
+      const csrfValidation = await validateCSRF(request)
+      if (csrfValidation) {
+        return csrfValidation
+      }
+    }
+    
+    // SECURITY: Verify session and check for admin role
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('callmap_session')?.value
+
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let decodedToken
+    try {
+      decodedToken = await verifySessionCookie(sessionCookie)
+    } catch (error: any) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
+
+    // Check if user is admin or superAdmin
+    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden. Admin access required.' },
+        { status: 403 }
+      )
+    }
+
     if (!adminDb) {
       return NextResponse.json(errorResponse('Firebase Admin not initialized'), { status: 500 })
     }
@@ -40,6 +74,7 @@ export async function POST(
     }
 
     // Create adjustment transaction atomically
+    let previousBalance = 0
     const result = await adminDb!.runTransaction(async (transaction) => {
       const userRef = adminDb!.collection('users').doc(userId)
       const userSnap = await transaction.get(userRef)
@@ -50,6 +85,7 @@ export async function POST(
 
       const userData = userSnap.data()!
       const currentBalance = userData?.tokenBalance ?? 0
+      previousBalance = currentBalance // Store for audit logging
       const newBalance = currentBalance + amount
 
       // Don't allow negative balances
@@ -86,6 +122,31 @@ export async function POST(
         newBalance,
         timestamp: now,
       }
+    })
+
+    // SECURITY: Log audit trail for admin operations
+    
+    const auditLogRef = adminDb!.collection('auditLogs').doc()
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown'
+    
+    auditLogRef.set({
+      action: 'wallet_adjustment',
+      adminUserId: decodedToken.uid,
+      adminEmail: decodedToken.email || null,
+      targetUserId: userId,
+      details: {
+        amount,
+        previousBalance,
+        newBalance: result.newBalance,
+        note: note || 'Manual adjustment by admin',
+      },
+      ipAddress: clientIp,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      userAgent: request.headers.get('user-agent') || null,
+    }).catch((error) => {
+      console.error('[admin/wallet/adjust] Error logging audit:', error)
     })
 
     // Log analytics event (non-blocking, outside transaction)

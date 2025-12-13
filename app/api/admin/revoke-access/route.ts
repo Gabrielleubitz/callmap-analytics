@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
 import { verifySessionCookie } from '@/lib/auth/session'
+import { adminDb } from '@/lib/firebase-admin'
 import { cookies } from 'next/headers'
+import * as admin from 'firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 
 /**
  * POST /api/admin/revoke-access
@@ -52,12 +55,35 @@ export async function POST(request: NextRequest) {
     // Revoke refresh tokens to force logout
     await auth.revokeRefreshTokens(uid)
 
+    // SECURITY: Log audit trail for access revocation
+    if (adminDb) {
+      const auditLogRef = adminDb.collection('auditLogs').doc()
+      const clientIp = request.headers.get('x-forwarded-for') || 
+                       request.headers.get('x-real-ip') || 
+                       'unknown'
+      
+      auditLogRef.set({
+        action: 'revoke_admin_access',
+        adminUserId: decodedToken.uid,
+        adminEmail: decodedToken.email || null,
+        targetUserId: uid,
+        details: {
+          revokedAt: new Date().toISOString(),
+        },
+        ipAddress: clientIp,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        userAgent: request.headers.get('user-agent') || null,
+      }).catch((error) => {
+        console.error('[Admin Revoke Access] Error logging audit:', error)
+      })
+    }
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('[Admin Revoke Access] Error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to revoke access' },
-      { status: 500 }
+    return errorResponse(
+      process.env.NODE_ENV === 'production' ? 'Failed to revoke access' : error.message,
+      500
     )
   }
 }

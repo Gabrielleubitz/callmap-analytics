@@ -4,7 +4,6 @@
       "https://callmap.ai",
       "https://www.callmap.ai",
       "https://engine.callmap.ai",
-      "https://*.vercel.app",
       "http://localhost:3000",
       "http://localhost:3001",
       "http://localhost:3003"

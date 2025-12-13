@@ -68,6 +68,7 @@ export function metricResponse<T>(
 
 /**
  * Create an error response with proper HTTP status
+ * SECURITY: Sanitizes error messages in production to prevent information disclosure
  */
 export function errorResponse(
   error: string,
@@ -75,10 +76,38 @@ export function errorResponse(
   details?: unknown,
   code?: string
 ): NextResponse<ErrorResponse> {
+  // SECURITY: In production, sanitize error messages to prevent information disclosure
+  const isProduction = process.env.NODE_ENV === 'production'
+  
+  let sanitizedError = error
+  let sanitizedDetails = details
+  
+  if (isProduction) {
+    // Generic error messages for production
+    if (status >= 500) {
+      sanitizedError = 'An internal error occurred'
+      sanitizedDetails = undefined
+    } else if (status === 401) {
+      sanitizedError = 'Unauthorized'
+      sanitizedDetails = undefined
+    } else if (status === 403) {
+      sanitizedError = 'Forbidden'
+      sanitizedDetails = undefined
+    } else if (status === 404) {
+      sanitizedError = 'Resource not found'
+      sanitizedDetails = undefined
+    }
+    // For 400 errors, we might want to keep some validation details, but sanitize them
+    if (status === 400 && details) {
+      // Only include validation errors, not internal error messages
+      sanitizedDetails = details
+    }
+  }
+  
   return NextResponse.json(
     {
-      error,
-      details,
+      error: sanitizedError,
+      details: sanitizedDetails,
       code,
     },
     { status }

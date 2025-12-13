@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { verifySessionCookie } from '@/lib/auth/session'
+import { cookies } from 'next/headers'
 import * as admin from 'firebase-admin'
 import { userUpdateSchema } from '@/lib/schemas'
 import { toFirestoreTimestamp } from '@/lib/utils/date'
@@ -13,6 +15,29 @@ import { validationError } from '@/lib/utils/api-response'
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // SECURITY: Verify session and check for admin role
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('callmap_session')?.value
+
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let decodedToken
+    try {
+      decodedToken = await verifySessionCookie(sessionCookie)
+    } catch (error: any) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
+
+    // Check if user is admin or superAdmin
+    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden. Admin access required.' },
+        { status: 403 }
+      )
+    }
+
     if (!adminDb) {
       return NextResponse.json(
         { error: 'Firebase Admin not initialized' },
@@ -62,8 +87,33 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       )
     }
 
+    // Get previous user data for audit logging
+    const previousUserData = userDoc.data()
+
     // Update the user document
     await db.collection('users').doc(userId).update(updateData)
+
+    // SECURITY: Log audit trail for user updates
+    const auditLogRef = db.collection('auditLogs').doc()
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown'
+    
+    auditLogRef.set({
+      action: 'user_update',
+      adminUserId: decodedToken.uid,
+      adminEmail: decodedToken.email || null,
+      targetUserId: userId,
+      details: {
+        previousData: previousUserData,
+        updatedFields: updateData,
+      },
+      ipAddress: clientIp,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      userAgent: request.headers.get('user-agent') || null,
+    }).catch((error) => {
+      console.error('[users/update] Error logging audit:', error)
+    })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

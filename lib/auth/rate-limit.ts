@@ -1,7 +1,10 @@
 /**
  * Simple in-memory rate limiting
  * 
- * For production, use a proper rate limiting solution like Redis.
+ * DEPRECATED: Use rate-limit-kv.ts for production (distributed rate limiting).
+ * This is kept for backward compatibility and as a fallback.
+ * 
+ * For production, use checkRateLimitKV from rate-limit-kv.ts
  */
 
 interface RateLimitEntry {

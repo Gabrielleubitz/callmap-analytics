@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
 import { verifySessionCookie } from '@/lib/auth/session'
+import { adminDb } from '@/lib/firebase-admin'
 import { cookies } from 'next/headers'
+import * as admin from 'firebase-admin'
+import { errorResponse } from '@/lib/utils/api-response'
 
 /**
  * POST /api/admin/set-role
@@ -56,12 +59,35 @@ export async function POST(request: NextRequest) {
       role: role,
     })
 
+    // SECURITY: Log audit trail for role changes
+    if (adminDb) {
+      const auditLogRef = adminDb.collection('auditLogs').doc()
+      const clientIp = request.headers.get('x-forwarded-for') || 
+                       request.headers.get('x-real-ip') || 
+                       'unknown'
+      
+      auditLogRef.set({
+        action: 'set_admin_role',
+        adminUserId: decodedToken.uid,
+        adminEmail: decodedToken.email || null,
+        targetUserId: uid,
+        details: {
+          role,
+        },
+        ipAddress: clientIp,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        userAgent: request.headers.get('user-agent') || null,
+      }).catch((error) => {
+        console.error('[Admin Set Role] Error logging audit:', error)
+      })
+    }
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('[Admin Set Role] Error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to set role' },
-      { status: 500 }
+    return errorResponse(
+      process.env.NODE_ENV === 'production' ? 'Failed to set role' : error.message,
+      500
     )
   }
 }

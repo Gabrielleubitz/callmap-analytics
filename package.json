@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@upstash/redis": "^1.35.8",
     "clsx": "^2.1.1",
+    "csrf": "^3.1.0",
     "date-fns": "^3.6.0",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
