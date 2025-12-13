@@ -97,9 +97,15 @@ export default function UsagePage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Usage & Tokens</h1>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-3xl font-bold text-gray-900">Usage & Token Analytics</h1>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Monitor AI token consumption and platform usage. Tokens are consumed when processing mindmaps - this is your main cost driver. 
+          Track usage by model, source type, and identify expensive sessions. Teams Over Quota shows teams approaching their limits.
+        </p>
       </div>
 
       {/* Hero Metrics Row */}
@@ -117,21 +123,30 @@ export default function UsagePage() {
         />
       ) : metrics.data ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
-          <HeroMetricCard
-            title="Total Tokens"
-            value={formatNumber(totalTokens)}
-            icon={<Zap className="h-5 w-5" />}
-          />
-          <HeroMetricCard
-            title="Total Cost"
-            value={formatCurrency(metrics.data.totalCost || 0)}
-            icon={<DollarSign className="h-5 w-5" />}
-          />
-          <HeroMetricCard
-            title="Avg Tokens/Session"
-            value={formatNumber(metrics.data.avgTokensPerSession || 0)}
-            icon={<TrendingUp className="h-5 w-5" />}
-          />
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="Total Tokens"
+              value={formatNumber(totalTokens)}
+              icon={<Zap className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Sum of all tokens (input + output) used for AI processing</p>
+          </div>
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="Total Cost"
+              value={formatCurrency(metrics.data.totalCost || 0)}
+              icon={<DollarSign className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Total cost of AI processing based on token usage</p>
+          </div>
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="Avg Tokens/Session"
+              value={formatNumber(metrics.data.avgTokensPerSession || 0)}
+              icon={<TrendingUp className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Average tokens per mindmap session (lower = more efficient)</p>
+          </div>
         </div>
       ) : null}
 
@@ -140,7 +155,8 @@ export default function UsagePage() {
         <div className="space-y-6 mb-8">
           {/* Token Usage Section */}
           <MetricGroupCard
-            title="Token Usage"
+            title="Token Usage Breakdown"
+            description="Tokens In = input to AI models, Tokens Out = AI-generated output. Models Used shows how many different AI models are being utilized."
             metrics={[
               {
                 label: "Tokens In",
@@ -160,6 +176,7 @@ export default function UsagePage() {
           {/* Session Metrics Section */}
           <MetricGroupCard
             title="Session Metrics"
+            description="Avg Tokens/Session shows efficiency. Expensive Sessions are mindmaps that consumed unusually high tokens - review these for optimization opportunities."
             metrics={[
               {
                 label: "Avg Tokens/Session",
@@ -220,7 +237,11 @@ export default function UsagePage() {
         ) : tokensByModelChart.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Tokens by Model Per Day</CardTitle>
+              <CardTitle>Tokens by AI Model Per Day</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Breakdown of token usage by AI model (e.g., GPT-4, Claude, etc.). Different models have different costs per token. 
+                This helps you understand which models are most popular and their cost impact.
+              </p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -280,6 +301,10 @@ export default function UsagePage() {
         <Card>
           <CardHeader>
             <CardTitle>Most Expensive Sessions</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Mindmap sessions that consumed the most tokens and cost the most. These may be large files or complex processing. 
+              Review to understand usage patterns and identify optimization opportunities.
+            </p>
           </CardHeader>
           <CardContent>
             {expensiveSessions.isLoading ? (
@@ -328,7 +353,11 @@ export default function UsagePage() {
         {/* Teams Over Quota */}
         <Card>
           <CardHeader>
-            <CardTitle>Teams Over Quota</CardTitle>
+            <CardTitle>Teams Over Quota (80%+)</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Teams using 80% or more of their monthly token quota. These teams may need to upgrade their plan or reduce usage. 
+              Consider reaching out proactively to discuss options before they hit their limit.
+            </p>
           </CardHeader>
           <CardContent>
             {teamsOverQuota.isLoading ? (
@@ -386,8 +415,12 @@ export default function UsagePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" />
-              Wallet Movement
+              Token Wallet Activity
             </CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Track token wallet credits (additions) and debits (usage) across all users. Credits come from purchases or grants, 
+              debits are token consumption. Net shows overall wallet balance changes. Low balance alerts help identify users who may need to top up.
+            </p>
           </CardHeader>
           <CardContent>
             {walletMetrics.isLoading ? (

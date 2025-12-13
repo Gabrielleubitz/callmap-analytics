@@ -143,9 +143,11 @@ export default function JourneysPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Journey Explorer</h1>
-        <p className="mt-2 text-gray-600">
-          Explore chronological timeline of events for users or teams
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">User & Team Journey Explorer</h1>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          View a chronological timeline of all events for a specific user or team. See their complete journey: signups, mindmap creation, 
+          edits, exports, errors, and more. Use this to understand user behavior, debug issues, or analyze engagement patterns. 
+          Search for users by name or email, or enter a team ID directly.
         </p>
       </div>
 

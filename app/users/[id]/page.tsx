@@ -141,58 +141,64 @@ export default function UserDetailPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-medium">
-            {getInitials(displayUser.name || displayUser.email)}
-          </div>
-          <div>
-            {isEditing ? (
-              <Input
-                value={displayUser.name || ''}
-                onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                className="text-2xl font-bold"
-                placeholder="Name"
-              />
-            ) : (
-              <h1 className="text-3xl font-bold text-gray-900">{displayUser.name || "No Name"}</h1>
-            )}
-            <div className="mt-1 flex items-center gap-2">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-medium">
+              {getInitials(displayUser.name || displayUser.email)}
+            </div>
+            <div>
               {isEditing ? (
                 <Input
-                  value={displayUser.email || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-64"
-                  type="email"
+                  value={displayUser.name || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                  className="text-2xl font-bold"
+                  placeholder="Name"
                 />
               ) : (
-                <span className="text-gray-600">{displayUser.email}</span>
+                <h1 className="text-3xl font-bold text-gray-900">{displayUser.name || "No Name"}</h1>
               )}
-              {!isEditing && (
-                <>
-                  <Badge variant="outline">{displayUser.role}</Badge>
-                  <Badge variant={displayUser.status === "active" ? "default" : "secondary"}>
-                    {displayUser.status}
-              </Badge>
-                </>
-              )}
+              <div className="mt-1 flex items-center gap-2">
+                {isEditing ? (
+                  <Input
+                    value={displayUser.email || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                    className="w-64"
+                    type="email"
+                  />
+                ) : (
+                  <span className="text-gray-600">{displayUser.email}</span>
+                )}
+                {!isEditing && (
+                  <>
+                    <Badge variant="outline">{displayUser.role}</Badge>
+                    <Badge variant={displayUser.status === "active" ? "default" : "secondary"}>
+                      {displayUser.status}
+                </Badge>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
+                <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>Edit</Button>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-              <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => setIsEditing(true)}>Edit</Button>
-          )}
-        </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Complete user profile and activity. View user details, edit information, see their sessions, token balance, 
+          audit logs, and feature flag overrides. Use this page to manage users, troubleshoot issues, or understand user behavior.
+        </p>
       </div>
 
       {/* Editable User Data */}

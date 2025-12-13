@@ -59,9 +59,15 @@ export default function OpsPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Ops</h1>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-3xl font-bold text-gray-900">Operations Dashboard</h1>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Monitor system operations, AI job processing, webhook activity, and system errors. 
+          Use this page to identify performance issues, failed jobs, and webhook problems that need attention.
+        </p>
       </div>
 
       <Tabs defaultValue="ai-jobs">

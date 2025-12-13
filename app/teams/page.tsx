@@ -110,8 +110,12 @@ export default function TeamsPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Teams</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">Team Management</h1>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Manage all teams (workspaces) in your platform. Each team represents a group of users working together. 
+          Filter by plan (Free, Pro, Team, Enterprise) or status. Click on any team to view members, usage, billing, and detailed analytics.
+        </p>
       </div>
 
       {/* Filter Bar */}

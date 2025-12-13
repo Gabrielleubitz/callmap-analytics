@@ -88,17 +88,23 @@ export default function TeamDetailPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{team.name}</h1>
-          <div className="mt-2 flex items-center gap-2">
-            <Badge variant="outline">{team.plan}</Badge>
-            <Badge variant={team.is_active ? "default" : "secondary"}>
-              {team.is_active ? "Active" : "Inactive"}
-            </Badge>
-            <span className="text-sm text-gray-500">Created {formatDate(team.created_at)}</span>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{team.name}</h1>
+            <div className="mt-2 flex items-center gap-2">
+              <Badge variant="outline">{team.plan}</Badge>
+              <Badge variant={team.is_active ? "default" : "secondary"}>
+                {team.is_active ? "Active" : "Inactive"}
+              </Badge>
+              <span className="text-sm text-gray-500">Created {formatDate(team.created_at)}</span>
+            </div>
           </div>
         </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Detailed view of this team&apos;s activity, members, usage, billing, and API access. Use the tabs below to explore different aspects. 
+          Monitor token usage, session activity, subscription status, and team engagement.
+        </p>
       </div>
 
       {/* KPIs */}

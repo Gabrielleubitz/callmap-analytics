@@ -67,9 +67,15 @@ export default function BillingPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-3xl font-bold text-gray-900">Billing & Revenue</h1>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Monitor your revenue, subscriptions, invoices, and payments. MRR (Monthly Recurring Revenue) is your predictable monthly income. 
+          Track unpaid invoices, subscription churn, and revenue trends. Use this data to forecast and identify at-risk customers.
+        </p>
       </div>
 
       {/* Hero Metrics Row */}
@@ -87,21 +93,30 @@ export default function BillingPage() {
         />
       ) : metrics.data ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
-          <HeroMetricCard
-            title="MRR"
-            value={formatCurrency(metrics.data.mrr || 0)}
-            icon={<DollarSign className="h-5 w-5" />}
-          />
-          <HeroMetricCard
-            title="Total Revenue"
-            value={formatCurrency(metrics.data.totalRevenue || 0)}
-            icon={<TrendingUp className="h-5 w-5" />}
-          />
-          <HeroMetricCard
-            title="Unpaid Invoices"
-            value={formatCurrency(metrics.data.unpaidInvoices || 0)}
-            icon={<AlertCircle className="h-5 w-5" />}
-          />
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="MRR"
+              value={formatCurrency(metrics.data.mrr || 0)}
+              icon={<DollarSign className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Monthly Recurring Revenue - predictable monthly income from subscriptions</p>
+          </div>
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="Total Revenue"
+              value={formatCurrency(metrics.data.totalRevenue || 0)}
+              icon={<TrendingUp className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Total revenue from all payments and invoices in this period</p>
+          </div>
+          <div className="space-y-2">
+            <HeroMetricCard
+              title="Unpaid Invoices"
+              value={formatCurrency(metrics.data.unpaidInvoices || 0)}
+              icon={<AlertCircle className="h-5 w-5" />}
+            />
+            <p className="text-xs text-gray-500">Total amount of unpaid invoices (may need follow-up)</p>
+          </div>
         </div>
       ) : null}
 
@@ -110,7 +125,8 @@ export default function BillingPage() {
         <div className="space-y-6 mb-8">
           {/* Revenue Section */}
           <MetricGroupCard
-            title="Revenue"
+            title="Revenue Overview"
+            description="MRR is your predictable monthly income. Total Revenue includes all payments. Unpaid Invoices represent money owed - follow up on overdue invoices."
             metrics={[
               {
                 label: "MRR",
@@ -129,7 +145,8 @@ export default function BillingPage() {
 
           {/* Subscriptions Section */}
           <MetricGroupCard
-            title="Subscriptions"
+            title="Subscription Health"
+            description="Paying Teams are teams with active paid plans. Active Subscriptions are current subscriptions. Canceled This Month shows churn - monitor for trends."
             metrics={[
               {
                 label: "Paying Teams",
@@ -165,6 +182,9 @@ export default function BillingPage() {
           <Card>
             <CardHeader>
               <CardTitle>Revenue Over Time</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Daily revenue trend. Shows when money comes in from subscriptions and payments. An upward trend indicates business growth.
+              </p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -223,6 +243,10 @@ export default function BillingPage() {
           <Card>
             <CardHeader>
               <CardTitle>Churn: Canceled Subscriptions</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Monthly count of canceled subscriptions. Churn is customers leaving. Lower is better. 
+                If you see spikes, investigate why customers are canceling (e.g., pricing, features, support issues).
+              </p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -309,6 +333,10 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Invoices</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              All invoices sent to teams. Status shows if paid, open (unpaid), or void. Unpaid invoices represent money owed. 
+              Follow up on overdue invoices to maintain cash flow.
+            </p>
           </CardHeader>
           <CardContent>
             {invoices.isLoading ? (
@@ -366,7 +394,11 @@ export default function BillingPage() {
         {/* Payments */}
         <Card>
           <CardHeader>
-            <CardTitle>Payments</CardTitle>
+            <CardTitle>Payment Transactions</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              All successful payment transactions from teams. Shows when money was received, from which team, and the payment provider used. 
+              This is your actual cash flow.
+            </p>
           </CardHeader>
           <CardContent>
             {payments.isLoading ? (
@@ -420,7 +452,11 @@ export default function BillingPage() {
         {/* Credits */}
         <Card>
           <CardHeader>
-            <CardTitle>Credits</CardTitle>
+            <CardTitle>Account Credits</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Credits applied to team accounts (e.g., promotional credits, refunds, adjustments). 
+              Credits reduce the amount teams pay. Monitor to understand discount impact on revenue.
+            </p>
           </CardHeader>
           <CardContent>
             {credits.isLoading ? (

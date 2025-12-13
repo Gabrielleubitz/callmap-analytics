@@ -107,8 +107,12 @@ export default function UsersPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Users</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">User Management</h1>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          View and manage all users in your platform. Search by name or email, filter by role (Owner, Admin, Member) or status (Active, Invited, Disabled). 
+          Click on any user card to see detailed information including their activity, token balance, and session history.
+        </p>
       </div>
 
       {/* Filter Bar */}

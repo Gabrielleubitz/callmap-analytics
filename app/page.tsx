@@ -385,9 +385,15 @@ export default function OverviewPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Overview</h1>
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-3xl font-bold text-gray-900">Overview Dashboard</h1>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
+        <p className="text-gray-600 text-sm max-w-3xl">
+          Your central command center for monitoring platform health, user growth, usage patterns, and financial metrics. 
+          Use the date range picker to analyze different time periods. All metrics update automatically based on your selection.
+        </p>
       </div>
 
       {/* Hero Metrics Row */}
@@ -427,8 +433,8 @@ export default function OverviewPage() {
       {/* Section: Growth */}
       <div className="mb-6">
         <MetricGroupCard
-          title="Growth"
-          description="User acquisition and engagement metrics"
+          title="Growth Metrics"
+          description="Track how your user base is growing. New Registrations shows signups, Active 7d/30d shows users who logged in during those periods. Higher numbers indicate healthy growth."
           metrics={[
             {
               label: growthMetrics.newRegistrations.label,
@@ -476,8 +482,8 @@ export default function OverviewPage() {
       {/* Section: Revenue & Cost */}
       <div className="mb-6">
         <MetricGroupCard
-          title="Revenue & Cost"
-          description="Financial metrics with daily comparisons"
+          title="Revenue & Cost Metrics"
+          description="Track your financial health. Estimated Cost is what you pay for AI processing, Daily Revenue is income from subscriptions, and MRR is Monthly Recurring Revenue (predictable monthly income)."
           metrics={[
             {
               label: revenueMetrics.estimatedCost.label,
@@ -541,7 +547,10 @@ export default function OverviewPage() {
         {/* DAU vs Registrations */}
         <Card>
           <CardHeader>
-            <CardTitle>DAU vs Registrations</CardTitle>
+            <CardTitle>Daily Active Users vs New Registrations</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Compare daily active users (blue line) with new signups (green line). A healthy product shows active users growing faster than new signups, indicating good retention.
+            </p>
           </CardHeader>
           <CardContent>
             {dailyActive.isLoading ? (
@@ -611,7 +620,10 @@ export default function OverviewPage() {
         {/* Token Burn Rate */}
         <Card>
           <CardHeader>
-            <CardTitle>Token Burn Rate</CardTitle>
+            <CardTitle>Daily Token Consumption</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Tracks how many AI tokens are used each day. Tokens are consumed when processing mindmaps. Higher usage means more AI processing, which increases costs. Monitor for unusual spikes.
+            </p>
           </CardHeader>
           <CardContent>
             {tokensByModel.isLoading ? (
@@ -667,6 +679,9 @@ export default function OverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Top Teams by Tokens Used</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Teams using the most AI tokens in the selected period. Click a team name to see details. High usage teams may be good candidates for upsells or may need quota management.
+            </p>
           </CardHeader>
           <CardContent>
             {topTeamsTokens.isLoading ? (
@@ -741,6 +756,9 @@ export default function OverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recently Created Teams</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              New teams that signed up recently. Monitor for onboarding success. Teams created more than a week ago should have some activity - if not, they may need outreach.
+            </p>
           </CardHeader>
           <CardContent>
             {recentTeams.isLoading ? (
@@ -780,6 +798,9 @@ export default function OverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recently Failed AI Jobs</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              AI processing jobs that failed. Common causes: invalid input, API errors, or quota limits. If you see many failures, investigate the error messages to identify patterns.
+            </p>
           </CardHeader>
           <CardContent>
             {recentFailures.isLoading ? (
@@ -815,13 +836,23 @@ export default function OverviewPage() {
 
       {/* New Metrics Section */}
       <div className="mt-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Advanced Metrics</h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Advanced Metrics</h2>
+          <p className="text-gray-600 text-sm max-w-3xl">
+            Deep dive into platform performance metrics. These metrics help you understand user behavior, 
+            system performance, and product health beyond basic usage numbers.
+          </p>
+        </div>
         
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Mindmap Generation Time */}
           <Card>
             <CardHeader>
               <CardTitle>Mindmap Generation Time</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                How long it takes to generate mindmaps. Average shows typical performance, P95 shows worst-case scenarios. 
+                Faster times mean better user experience. If times are increasing, investigate system load or model performance.
+              </p>
             </CardHeader>
             <CardContent>
               {generationTime.isLoading ? (
@@ -905,6 +936,10 @@ export default function OverviewPage() {
           <Card>
             <CardHeader>
               <CardTitle>File → Map Conversion Rate</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Percentage of file uploads that successfully become mindmaps. High success rate (95%+) is good. 
+                Low rates indicate processing issues that need investigation. This is a key quality metric.
+              </p>
             </CardHeader>
             <CardContent>
               {conversionRate.isLoading ? (
@@ -989,7 +1024,11 @@ export default function OverviewPage() {
           {/* Funnel Tracking */}
           <Card>
             <CardHeader>
-              <CardTitle>Steps per Map (Funnel)</CardTitle>
+              <CardTitle>User Journey Funnel</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Tracks user progression through key actions: Upload → Process → Generate → View → Edit/Export. 
+                Conversion rates show where users drop off. Low conversion at any step indicates a friction point to fix.
+              </p>
             </CardHeader>
             <CardContent>
               {funnel.isLoading ? (
@@ -1092,6 +1131,10 @@ export default function OverviewPage() {
           <Card>
             <CardHeader>
               <CardTitle>Team Collaboration Activity</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Tracks team features like shared mindmaps, comments, and collaborative edits. High collaboration indicates 
+                strong team engagement. This is especially important for Team and Enterprise plans.
+              </p>
             </CardHeader>
             <CardContent>
               {collaboration.isLoading ? (
@@ -1135,7 +1178,11 @@ export default function OverviewPage() {
           {/* Token Burn by Feature */}
           <Card>
             <CardHeader>
-              <CardTitle>Token Burn per Feature</CardTitle>
+              <CardTitle>Token Consumption by Feature</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Shows which features consume the most tokens. Helps identify cost drivers and optimize expensive features. 
+                Features with high token usage may need optimization or different pricing models.
+              </p>
             </CardHeader>
             <CardContent>
               {tokenBurnByFeature.isLoading ? (
@@ -1183,7 +1230,14 @@ export default function OverviewPage() {
 
       {/* Map Economics Section */}
       <div className="mt-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Map Economics</h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Map Economics</h2>
+          <p className="text-gray-600 text-sm max-w-3xl">
+            Analyze profitability per team. AI Margin = MRR - Token Cost. Positive margin means the team is profitable. 
+            Negative margin means they cost more to serve than they pay. Cost/Map shows efficiency, Maps/User shows engagement. 
+            Health status: Green = profitable with good usage, Yellow = profitable but low usage, Red = losing money.
+          </p>
+        </div>
         
         {mapEconomics.isLoading ? (
           <LoadingState variant="card" />
@@ -1230,23 +1284,27 @@ export default function OverviewPage() {
             {/* Teams Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Team Economics</CardTitle>
+                <CardTitle>Team Economics Breakdown</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Detailed financial analysis for each team. AI Margin shows if a team is profitable (positive) or losing money (negative). 
+                  Teams with negative margins may need pricing adjustments or usage optimization. Click team names to see details.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Team</th>
-                        <th className="text-right p-2">Plan</th>
-                        <th className="text-right p-2">MRR</th>
-                        <th className="text-right p-2">Token Cost</th>
-                        <th className="text-right p-2">AI Margin</th>
-                        <th className="text-right p-2">Mindmaps</th>
-                        <th className="text-right p-2">Active Users</th>
-                        <th className="text-right p-2">Cost/Map</th>
-                        <th className="text-right p-2">Maps/User</th>
-                        <th className="text-center p-2">Health</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-2 font-medium text-gray-700">Team</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Subscription plan tier">Plan</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Monthly Recurring Revenue from this team">MRR</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Cost of AI processing for this team">Token Cost</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="MRR minus Token Cost (profitability)">AI Margin</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Total mindmaps created">Mindmaps</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Number of active users">Active Users</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Average cost per mindmap">Cost/Map</th>
+                        <th className="text-right p-2 font-medium text-gray-700" title="Average mindmaps per active user">Maps/User</th>
+                        <th className="text-center p-2 font-medium text-gray-700" title="Overall health: Green=profitable, Yellow=low usage, Red=losing money">Health</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1312,6 +1370,10 @@ export default function OverviewPage() {
           <Card>
             <CardHeader>
               <CardTitle>Retention Curves by Week-1 Behavior</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Each line shows how a user group retains over time. Exporters and heavy editors (green/blue) typically retain better than one-time users (red). 
+                Use this to identify which onboarding behaviors to encourage for better retention.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
