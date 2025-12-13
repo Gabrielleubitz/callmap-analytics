@@ -1,25 +1,27 @@
 "use client"
 
 /**
- * Ops Page - Redesigned
+ * Ops Page - Redesigned with Better Visual Understanding
  * 
- * New layout structure:
- * 1. Hero metrics per tab (AI Jobs, Webhooks, System Errors)
- * 2. Better organization with consistent styling
- * 3. Loading/Error/Empty states
- * 4. Consistent table styling
+ * Improvements:
+ * 1. Failed jobs shown prominently at top
+ * 2. Better visual formatting with colors and icons
+ * 3. Expandable error messages
+ * 4. Filters to show only failed jobs
+ * 5. Better descriptions explaining what each section means
  */
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { startOfDay, endOfDay, subDays } from "date-fns"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { EmptyState } from "@/components/ui/empty-state"
-import { formatCurrency, formatDate, formatNumber } from "@/lib/utils"
+import { formatCurrency, formatDate, formatNumber, formatDateTime } from "@/lib/utils"
 import {
   getAIJobs,
   getAIJobStats,
@@ -30,16 +32,34 @@ import {
 import { useApiData } from "@/lib/hooks/useApiData"
 import { HeroMetricCard } from "@/components/metrics/hero-metric-card"
 import Link from "next/link"
-import { AlertTriangle, Clock, Activity, CheckCircle, XCircle } from "lucide-react"
+import { AlertTriangle, Clock, Activity, CheckCircle, XCircle, Filter, ChevronDown, ChevronUp, Zap, FileText, Edit, Download } from "lucide-react"
+
+// Job type icons mapping
+const JOB_TYPE_ICONS: Record<string, any> = {
+  generate: Zap,
+  transcribe: FileText,
+  edit: Edit,
+  export: Download,
+}
+
+// Job type descriptions
+const JOB_TYPE_DESCRIPTIONS: Record<string, string> = {
+  generate: "Generate mindmap from content",
+  transcribe: "Transcribe audio/video to text",
+  edit: "AI-powered mindmap editing",
+  export: "Export mindmap to file",
+}
 
 export default function OpsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     start: startOfDay(subDays(new Date(), 7)),
     end: endOfDay(new Date()),
   })
+  const [showOnlyFailed, setShowOnlyFailed] = useState(false)
+  const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
 
   // Fetch all data using useApiData hook
-  const aiJobs = useApiData(() => getAIJobs({ page: 1, pageSize: 100, ...dateRange }), [dateRange])
+  const aiJobs = useApiData(() => getAIJobs({ page: 1, pageSize: 200, ...dateRange }), [dateRange])
   const aiJobStats = useApiData(() => getAIJobStats(dateRange), [dateRange])
   const webhookEndpoints = useApiData(() => getWebhookEndpoints({ page: 1, pageSize: 100 }), [])
   const webhookLogs = useApiData(() => getWebhookLogs({ page: 1, pageSize: 100 }), [])
@@ -50,11 +70,49 @@ export default function OpsPage() {
   const webhookLogsArray = webhookLogs.data?.data || []
 
   // Calculate derived data
-  const failedJobs = aiJobsArray.filter((j: any) => j.status === "failed")
+  const failedJobs = useMemo(() => 
+    aiJobsArray.filter((j: any) => j.status === "failed"),
+    [aiJobsArray]
+  )
+  const completedJobs = useMemo(() => 
+    aiJobsArray.filter((j: any) => j.status === "completed"),
+    [aiJobsArray]
+  )
+  const processingJobs = useMemo(() => 
+    aiJobsArray.filter((j: any) => j.status === "processing" || j.status === "queued"),
+    [aiJobsArray]
+  )
+
+  // Filter jobs based on toggle
+  const displayedJobs = useMemo(() => {
+    if (showOnlyFailed) return failedJobs
+    // Sort: failed first, then by date (newest first)
+    return [...aiJobsArray].sort((a: any, b: any) => {
+      if (a.status === "failed" && b.status !== "failed") return -1
+      if (a.status !== "failed" && b.status === "failed") return 1
+      const aTime = a.finished_at || a.started_at || a.created_at
+      const bTime = b.finished_at || b.started_at || b.created_at
+      if (!aTime && !bTime) return 0
+      if (!aTime) return 1
+      if (!bTime) return -1
+      return new Date(bTime).getTime() - new Date(aTime).getTime()
+    })
+  }, [aiJobsArray, showOnlyFailed, failedJobs])
+
   const systemErrors = [
     ...failedJobs,
     ...(webhookLogsArray.filter((l: any) => l.status_code && l.status_code >= 400))
   ]
+
+  const toggleErrorExpansion = (jobId: string) => {
+    const newExpanded = new Set(expandedErrors)
+    if (newExpanded.has(jobId)) {
+      newExpanded.delete(jobId)
+    } else {
+      newExpanded.add(jobId)
+    }
+    setExpandedErrors(newExpanded)
+  }
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -81,8 +139,8 @@ export default function OpsPage() {
         <TabsContent value="ai-jobs">
           {/* Hero Metrics */}
           {aiJobStats.isLoading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-              {[1, 2, 3].map((i) => (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
                 <LoadingState key={i} variant="card" />
               ))}
             </div>
@@ -93,31 +151,83 @@ export default function OpsPage() {
               onRetry={aiJobStats.refetch}
             />
           ) : aiJobStats.data ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
               <HeroMetricCard
-                title="Failure Rate"
-                value={`${(aiJobStats.data.failureRate || 0).toFixed(1)}%`}
-                icon={<AlertTriangle className="h-5 w-5" />}
+                title="Failed Jobs"
+                value={formatNumber(failedJobs.length)}
+                description={`${((failedJobs.length / aiJobsArray.length) * 100 || 0).toFixed(1)}% failure rate`}
+                icon={<XCircle className="h-5 w-5 text-red-600" />}
               />
               <HeroMetricCard
-                title="Longest Running Job"
-                value={aiJobStats.data.longestRunningJob
-                  ? `${(aiJobStats.data.longestRunningJob / 60).toFixed(1)}m`
-                  : "-"}
-                icon={<Clock className="h-5 w-5" />}
+                title="Completed"
+                value={formatNumber(completedJobs.length)}
+                description="Successfully finished"
+                icon={<CheckCircle className="h-5 w-5 text-green-600" />}
+              />
+              <HeroMetricCard
+                title="Processing"
+                value={formatNumber(processingJobs.length)}
+                description="Currently running"
+                icon={<Clock className="h-5 w-5 text-yellow-600" />}
               />
               <HeroMetricCard
                 title="Total Jobs"
                 value={formatNumber(aiJobsArray.length || 0)}
+                description="In selected period"
                 icon={<Activity className="h-5 w-5" />}
               />
             </div>
           ) : null}
 
+          {/* Failed Jobs Alert Banner */}
+          {failedJobs.length > 0 && (
+            <Card className="mb-6 border-red-200 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-red-900 mb-1">
+                        {failedJobs.length} Failed Job{failedJobs.length !== 1 ? 's' : ''} Detected
+                      </h3>
+                      <p className="text-sm text-red-700">
+                        {failedJobs.length === 1 
+                          ? "One AI job failed. Review the error message below to identify the issue."
+                          : `${failedJobs.length} AI jobs failed. Review the errors below to identify patterns. Common causes: API errors, invalid input, quota limits, or network issues.`}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant={showOnlyFailed ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowOnlyFailed(!showOnlyFailed)}
+                    className="flex items-center gap-2"
+                  >
+                    <Filter className="h-4 w-4" />
+                    {showOnlyFailed ? "Show All" : "Show Only Failed"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* AI Jobs Table */}
           <Card>
             <CardHeader>
-              <CardTitle>AI Jobs</CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>AI Processing Jobs</CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">
+                    All AI operations that process mindmaps: generation, transcription, editing, and exports. 
+                    Each job represents one AI API call. Failed jobs are highlighted in red. Click error messages to expand.
+                  </p>
+                </div>
+                {failedJobs.length > 0 && (
+                  <Badge variant="destructive" className="text-sm">
+                    {failedJobs.length} Failed
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {aiJobs.isLoading ? (
@@ -128,28 +238,30 @@ export default function OpsPage() {
                   description={aiJobs.error?.message}
                   onRetry={aiJobs.refetch}
                 />
-              ) : aiJobsArray.length === 0 ? (
+              ) : displayedJobs.length === 0 ? (
                 <EmptyState
-                  title="No AI jobs"
-                  description="No AI jobs found in this date range."
+                  title={showOnlyFailed ? "No failed jobs" : "No AI jobs"}
+                  description={showOnlyFailed 
+                    ? "Great! No jobs failed in this date range."
+                    : "No AI jobs found in this date range."}
                 />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Type</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Status</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Session</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Started</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Finished</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Duration</th>
-                        <th className="text-right py-2 px-2 font-medium text-gray-700">Cost</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Error</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Job Type</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Status</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Session ID</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Started</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Duration</th>
+                        <th className="text-right py-3 px-3 font-semibold text-gray-700">Tokens</th>
+                        <th className="text-right py-3 px-3 font-semibold text-gray-700">Cost</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Error Message</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {aiJobsArray.map((job: any) => {
+                      {displayedJobs.map((job: any) => {
                         const duration =
                           job.started_at && job.finished_at
                             ? Math.round(
@@ -158,13 +270,34 @@ export default function OpsPage() {
                                   1000
                               )
                             : null
+                        
+                        const isFailed = job.status === "failed"
+                        const isExpanded = expandedErrors.has(job.id)
+                        const JobIcon = JOB_TYPE_ICONS[job.type] || Activity
+                        const jobDescription = JOB_TYPE_DESCRIPTIONS[job.type] || job.type
+                        const totalTokens = (job.tokens_in || 0) + (job.tokens_out || 0)
 
                         return (
-                          <tr key={job.id} className="border-b hover:bg-gray-50">
-                            <td className="py-2 px-2">
-                              <Badge variant="outline">{job.type}</Badge>
+                          <tr 
+                            key={job.id} 
+                            className={`border-b transition-colors ${
+                              isFailed 
+                                ? "bg-red-50 hover:bg-red-100" 
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2">
+                                <JobIcon className={`h-4 w-4 ${isFailed ? "text-red-600" : "text-gray-500"}`} />
+                                <div>
+                                  <Badge variant="outline" className={isFailed ? "border-red-300 text-red-700" : ""}>
+                                    {job.type}
+                                  </Badge>
+                                  <div className="text-xs text-gray-500 mt-0.5">{jobDescription}</div>
+                                </div>
+                              </div>
                             </td>
-                            <td className="py-2 px-2">
+                            <td className="py-3 px-3">
                               <Badge
                                 variant={
                                   job.status === "completed"
@@ -173,34 +306,101 @@ export default function OpsPage() {
                                     ? "destructive"
                                     : "secondary"
                                 }
+                                className="font-medium"
                               >
+                                {job.status === "completed" && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {job.status === "failed" && <XCircle className="h-3 w-3 mr-1" />}
+                                {job.status === "processing" && <Clock className="h-3 w-3 mr-1" />}
                                 {job.status}
                               </Badge>
                             </td>
-                            <td className="py-2 px-2">
+                            <td className="py-3 px-3">
                               {job.session_id ? (
-                                <span className="font-mono text-xs">{job.session_id.slice(0, 8)}</span>
+                                <Link 
+                                  href={`/journeys?entityType=user&entityId=${job.session_id}`}
+                                  className="font-mono text-xs text-blue-600 hover:underline"
+                                >
+                                  {job.session_id.slice(0, 12)}...
+                                </Link>
                               ) : (
-                                "-"
+                                <span className="text-gray-400">-</span>
                               )}
                             </td>
-                            <td className="py-2 px-2">
-                              {job.started_at ? formatDate(job.started_at) : "-"}
-                            </td>
-                            <td className="py-2 px-2">
-                              {job.finished_at ? formatDate(job.finished_at) : "-"}
-                            </td>
-                            <td className="py-2 px-2">
-                              {duration !== null ? `${duration}s` : "-"}
-                            </td>
-                            <td className="py-2 px-2 text-right">
-                              {job.cost_usd ? formatCurrency(job.cost_usd) : "-"}
-                            </td>
-                            <td className="py-2 px-2">
-                              {job.error_message ? (
-                                <span className="text-xs text-red-600">{job.error_message}</span>
+                            <td className="py-3 px-3">
+                              {job.started_at ? (
+                                <div className="text-xs">
+                                  <div>{formatDate(job.started_at)}</div>
+                                  <div className="text-gray-500">{formatDateTime(job.started_at).split(' ')[1]}</div>
+                                </div>
                               ) : (
-                                "-"
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3">
+                              {duration !== null ? (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-gray-400" />
+                                  <span className={duration > 60 ? "text-orange-600 font-medium" : ""}>
+                                    {duration > 60 ? `${Math.floor(duration / 60)}m ${duration % 60}s` : `${duration}s`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {totalTokens > 0 ? (
+                                <div className="text-xs">
+                                  <div className="font-medium">{formatNumber(totalTokens)}</div>
+                                  <div className="text-gray-500">
+                                    {job.tokens_in && job.tokens_out 
+                                      ? `${formatNumber(job.tokens_in)} in / ${formatNumber(job.tokens_out)} out`
+                                      : ""}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              {job.cost_usd ? (
+                                <span className="font-medium">{formatCurrency(job.cost_usd)}</span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3">
+                              {job.error_message ? (
+                                <div className="max-w-md">
+                                  <button
+                                    onClick={() => toggleErrorExpansion(job.id)}
+                                    className="flex items-start gap-2 text-left w-full group"
+                                  >
+                                    <div className={`flex-1 text-xs ${isFailed ? "text-red-700" : "text-gray-600"}`}>
+                                      <div className={`font-medium mb-1 ${isFailed ? "text-red-900" : ""}`}>
+                                        {isExpanded ? "Hide Error" : "Show Error"}
+                                      </div>
+                                      {isExpanded ? (
+                                        <div className="bg-red-100 border border-red-200 rounded p-2 font-mono text-xs whitespace-pre-wrap break-words">
+                                          {job.error_message}
+                                        </div>
+                                      ) : (
+                                        <div className="truncate">
+                                          {job.error_message.length > 60 
+                                            ? `${job.error_message.substring(0, 60)}...`
+                                            : job.error_message}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0 group-hover:text-red-800" />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
                               )}
                             </td>
                           </tr>
@@ -241,6 +441,10 @@ export default function OpsPage() {
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Webhook Endpoints</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Configured webhook URLs that receive notifications when events occur (e.g., mindmap created, user signed up). 
+                Monitor success rates to ensure webhooks are working. Low success rates indicate the endpoint may be down or rejecting requests.
+              </p>
             </CardHeader>
             <CardContent>
               {webhookEndpoints.isLoading ? (
@@ -318,7 +522,11 @@ export default function OpsPage() {
           {/* Webhook Logs */}
           <Card>
             <CardHeader>
-              <CardTitle>Webhook Logs</CardTitle>
+              <CardTitle>Webhook Delivery Logs</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                History of all webhook delivery attempts. Shows which webhooks succeeded (status 200-299) and which failed (400+). 
+                Failed webhooks are retried automatically. Check error messages to see why deliveries failed.
+              </p>
             </CardHeader>
             <CardContent>
               {webhookLogs.isLoading ? (
@@ -385,60 +593,109 @@ export default function OpsPage() {
           {/* Hero Metrics */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
             <HeroMetricCard
-              title="Failed Jobs"
+              title="Failed AI Jobs"
               value={formatNumber(failedJobs.length)}
-              icon={<AlertTriangle className="h-5 w-5" />}
+              description="AI processing jobs that failed"
+              icon={<XCircle className="h-5 w-5 text-red-600" />}
             />
             <HeroMetricCard
               title="Failed Webhooks"
               value={formatNumber(
                 webhookLogsArray.filter((l: any) => l.status_code && l.status_code >= 400).length || 0
               )}
-              icon={<XCircle className="h-5 w-5" />}
+              description="Webhook calls that returned errors"
+              icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
             />
           </div>
 
           {/* System Errors Table */}
           <Card>
             <CardHeader>
-              <CardTitle>System Errors</CardTitle>
+              <CardTitle>All System Errors</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Combined view of all failed AI jobs and failed webhook calls. Use this to identify patterns in errors 
+                and prioritize fixes. Errors are sorted by most recent first.
+              </p>
             </CardHeader>
             <CardContent>
               {systemErrors.length === 0 ? (
                 <EmptyState
                   title="No system errors"
-                  description="No system errors found in this date range."
+                  description="Great! No errors found in this date range. All AI jobs and webhooks are working correctly."
                 />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Type</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">ID</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Error</th>
-                        <th className="text-left py-2 px-2 font-medium text-gray-700">Time</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Error Type</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">ID</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Error Message</th>
+                        <th className="text-left py-3 px-3 font-semibold text-gray-700">Time</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {systemErrors.map((error: any) => (
-                        <tr key={error.id} className="border-b hover:bg-gray-50">
-                          <td className="py-2 px-2">
-                            <Badge variant="destructive">
-                              {error.type || "webhook"}
-                            </Badge>
-                          </td>
-                          <td className="py-2 px-2 font-mono text-xs">{error.id.slice(0, 8)}</td>
-                          <td className="py-2 px-2">
-                            <span className="text-xs text-red-600">
-                              {error.error_message || error.status_code || "Unknown error"}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2">
-                            {formatDate(error.finished_at || error.attempted_at || error.created_at)}
-                          </td>
-                        </tr>
-                      ))}
+                      {systemErrors
+                        .sort((a: any, b: any) => {
+                          const aTime = a.finished_at || a.attempted_at || a.created_at
+                          const bTime = b.finished_at || b.attempted_at || b.created_at
+                          if (!aTime && !bTime) return 0
+                          if (!aTime) return 1
+                          if (!bTime) return -1
+                          return new Date(bTime).getTime() - new Date(aTime).getTime()
+                        })
+                        .map((error: any) => {
+                          const isExpanded = expandedErrors.has(error.id)
+                          const errorType = error.type || (error.status_code ? "webhook" : "ai_job")
+                          
+                          return (
+                            <tr key={error.id} className="border-b bg-red-50 hover:bg-red-100">
+                              <td className="py-3 px-3">
+                                <Badge variant="destructive" className="font-medium">
+                                  {errorType === "ai_job" && <Zap className="h-3 w-3 mr-1" />}
+                                  {errorType === "webhook" && <Activity className="h-3 w-3 mr-1" />}
+                                  {errorType}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="font-mono text-xs">{error.id.slice(0, 12)}...</span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="max-w-lg">
+                                  <button
+                                    onClick={() => toggleErrorExpansion(error.id)}
+                                    className="flex items-start gap-2 text-left w-full group"
+                                  >
+                                    <div className="flex-1 text-xs text-red-700">
+                                      {isExpanded ? (
+                                        <div className="bg-red-100 border border-red-200 rounded p-2 font-mono text-xs whitespace-pre-wrap break-words">
+                                          {error.error_message || error.status_code || "Unknown error"}
+                                        </div>
+                                      ) : (
+                                        <div className="truncate font-medium">
+                                          {error.error_message || error.status_code || "Unknown error"}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0 group-hover:text-red-800" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="text-xs">
+                                  <div>{formatDate(error.finished_at || error.attempted_at || error.created_at)}</div>
+                                  <div className="text-gray-500">
+                                    {formatDateTime(error.finished_at || error.attempted_at || error.created_at).split(' ')[1]}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                     </tbody>
                   </table>
                 </div>

@@ -12,6 +12,7 @@ import { LineChart, Line, ResponsiveContainer } from "recharts"
 interface HeroMetricCardProps {
   title: string
   value: string | number
+  description?: string
   delta?: {
     value: number
     label?: string
@@ -24,6 +25,7 @@ interface HeroMetricCardProps {
 export function HeroMetricCard({
   title,
   value,
+  description,
   delta,
   sparkline,
   icon,
@@ -50,6 +52,9 @@ export function HeroMetricCard({
       <CardContent>
         <div className="space-y-2">
           <div className="text-3xl font-bold text-gray-900">{formatValue(value)}</div>
+          {description && (
+            <div className="text-xs text-gray-500">{description}</div>
+          )}
           
           {delta && (
             <div className={`flex items-center gap-1 text-sm ${deltaColor}`}>
