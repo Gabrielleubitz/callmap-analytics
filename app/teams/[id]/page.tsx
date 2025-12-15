@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { startOfDay, endOfDay, subDays } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -71,6 +71,59 @@ export default function TeamDetailPage() {
     if (teamId) load()
   }, [teamId, dateRange])
 
+  const { sessionsOverTime, tokensOverTime, totalTokensInRange } = useMemo(() => {
+    const byDate = new Map<
+      string,
+      {
+        date: string
+        count: number
+        tokens: number
+      }
+    >()
+
+    let totalTokens = 0
+
+    sessions.forEach((session) => {
+      const created = session.created_at ? new Date(session.created_at) : null
+      if (!created) return
+
+      const dateKey = created.toISOString().split("T")[0]
+      const tokens =
+        (session.tokens_in || 0) +
+        (session.tokens_out || 0)
+
+      totalTokens += tokens
+
+      if (!byDate.has(dateKey)) {
+        byDate.set(dateKey, {
+          date: dateKey,
+          count: 0,
+          tokens: 0,
+        })
+      }
+
+      const current = byDate.get(dateKey)!
+      current.count += 1
+      current.tokens += tokens
+    })
+
+    const ordered = Array.from(byDate.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    )
+
+    return {
+      sessionsOverTime: ordered.map((d) => ({
+        date: d.date,
+        count: d.count,
+      })),
+      tokensOverTime: ordered.map((d) => ({
+        date: d.date,
+        tokens: d.tokens,
+      })),
+      totalTokensInRange: totalTokens,
+    }
+  }, [sessions])
+
   if (!team) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -130,7 +183,9 @@ export default function TeamDetailPage() {
             <CardTitle className="text-sm font-medium text-gray-600">Tokens This Month</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {formatNumber(totalTokensInRange)}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -155,9 +210,9 @@ export default function TeamDetailPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={[]}>
+              <AreaChart data={sessionsOverTime}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis />
+                <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip />
                 <Area type="monotone" dataKey="count" stroke="#8884d8" fill="#8884d8" />
@@ -172,9 +227,9 @@ export default function TeamDetailPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={[]}>
+              <LineChart data={tokensOverTime}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis />
+                <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip />
                 <Line type="monotone" dataKey="tokens" stroke="#8884d8" />
