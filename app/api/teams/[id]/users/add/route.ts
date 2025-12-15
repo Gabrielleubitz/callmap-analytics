@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { adminDb } from '@/lib/firebase-admin'
+import { verifySessionCookie } from '@/lib/auth/session'
+import { cookies } from 'next/headers'
+import * as admin from 'firebase-admin'
+
+/**
+ * Add an existing user (by email) to a team/workspace.
+ *
+ * - Looks up the user document by email
+ * - Sets workspaceId/teamId on the user doc
+ * - Optionally updates role
+ */
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('callmap_session')?.value
+
+    if (!sessionCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let decodedToken
+    try {
+      decodedToken = await verifySessionCookie(sessionCookie)
+    } catch {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
+
+    // Only admin/superAdmin can manage team members
+    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden. Admin access required.' },
+        { status: 403 }
+      )
+    }
+
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin not initialized' },
+        { status: 500 }
+      )
+    }
+
+    const db = adminDb
+    const teamId = params.id
+    const body = await request.json()
+    const email = (body.email || '').toLowerCase().trim()
+    const role = body.role || 'member'
+
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
+    // Find user by email
+    const usersSnapshot = await db
+      .collection('users')
+      .where('email', '==', email)
+      .limit(1)
+      .get()
+
+    if (usersSnapshot.empty) {
+      return NextResponse.json({ error: 'User not found for this email' }, { status: 404 })
+    }
+
+    const userDoc = usersSnapshot.docs[0]
+    const userRef = db.collection('users').doc(userDoc.id)
+
+    await userRef.update({
+      workspaceId: teamId,
+      teamId,
+      role,
+      status: 'active',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+
+    return NextResponse.json({ success: true, userId: userDoc.id })
+  } catch (error: any) {
+    console.error('[teams/users/add] Error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to add user to team' },
+      { status: 500 }
+    )
+  }
+}
+
+

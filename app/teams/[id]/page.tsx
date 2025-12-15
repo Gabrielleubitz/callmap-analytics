@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils"
 import {
   getTeamDetail,
@@ -24,6 +27,7 @@ import {
   getTeamAuditLogs,
   DateRange,
 } from "@/lib/db"
+import type { UserRole } from "@/lib/types"
 import {
   LineChart,
   Line,
@@ -46,6 +50,11 @@ export default function TeamDetailPage() {
   const [billing, setBilling] = useState<any>(null)
   const [api, setApi] = useState<any>(null)
   const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [isUserActionLoading, setIsUserActionLoading] = useState(false)
+  const [userActionError, setUserActionError] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<UserRole>("member")
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
   const [dateRange] = useState<DateRange>({
     start: startOfDay(subDays(new Date(), 30)),
     end: endOfDay(new Date()),
@@ -68,8 +77,92 @@ export default function TeamDetailPage() {
       setApi(a)
       setAuditLogs(al.data)
     }
-    if (teamId) load()
+    if (teamId) void load()
   }, [teamId, dateRange])
+
+  async function refreshUsers() {
+    if (!teamId) return
+    const u = await getTeamUsers(teamId, { page: 1, pageSize: 100 })
+    setUsers(u.data)
+  }
+
+  async function handleInviteUser(e: React.FormEvent) {
+    e.preventDefault()
+    if (!teamId || !inviteEmail) return
+    try {
+      setIsUserActionLoading(true)
+      setUserActionError(null)
+
+      const res = await fetch(`/api/teams/${teamId}/users/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to add user")
+      }
+
+      setInviteEmail("")
+      setInviteRole("member")
+      await refreshUsers()
+    } catch (err: any) {
+      setUserActionError(err.message || "Failed to add user")
+    } finally {
+      setIsUserActionLoading(false)
+    }
+  }
+
+  async function handleChangeRole(userId: string, role: UserRole) {
+    if (!teamId) return
+    try {
+      setUpdatingUserId(userId)
+      setUserActionError(null)
+
+      const res = await fetch(`/api/teams/${teamId}/users/update-role`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to update role")
+      }
+
+      await refreshUsers()
+    } catch (err: any) {
+      setUserActionError(err.message || "Failed to update role")
+    } finally {
+      setUpdatingUserId(null)
+    }
+  }
+
+  async function handleRemoveUser(userId: string) {
+    if (!teamId) return
+    try {
+      setUpdatingUserId(userId)
+      setUserActionError(null)
+
+      const res = await fetch(`/api/teams/${teamId}/users/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to remove user")
+      }
+
+      await refreshUsers()
+    } catch (err: any) {
+      setUserActionError(err.message || "Failed to remove user")
+    } finally {
+      setUpdatingUserId(null)
+    }
+  }
 
   const { sessionsOverTime, tokensOverTime, totalTokensInRange } = useMemo(() => {
     const byDate = new Map<
@@ -252,7 +345,36 @@ export default function TeamDetailPage() {
         <TabsContent value="users">
           <Card>
             <CardHeader>
-              <CardTitle>Users</CardTitle>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle>Users</CardTitle>
+                <form
+                  onSubmit={handleInviteUser}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                >
+                  <Input
+                    type="email"
+                    placeholder="Add user by email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-56"
+                  />
+                  <Select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as UserRole)}
+                    className="w-32"
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="admin">Admin</option>
+                    <option value="member">Member</option>
+                  </Select>
+                  <Button type="submit" size="sm" disabled={isUserActionLoading}>
+                    {isUserActionLoading ? "Adding..." : "Add user"}
+                  </Button>
+                </form>
+              </div>
+              {userActionError && (
+                <p className="mt-2 text-sm text-red-500">{userActionError}</p>
+              )}
             </CardHeader>
             <CardContent>
               <Table>
@@ -263,6 +385,7 @@ export default function TeamDetailPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Last Activity</TableHead>
+                    <TableHead className="w-24 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -271,7 +394,18 @@ export default function TeamDetailPage() {
                       <TableCell className="font-medium">{user.name || "-"}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{user.role}</Badge>
+                        <Select
+                          value={user.role}
+                          onChange={(e) =>
+                            handleChangeRole(user.id, e.target.value as UserRole)
+                          }
+                          className="w-28"
+                          disabled={updatingUserId === user.id}
+                        >
+                          <option value="owner">Owner</option>
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.status === "active" ? "default" : "secondary"}>
@@ -280,6 +414,16 @@ export default function TeamDetailPage() {
                       </TableCell>
                       <TableCell>
                         {user.last_activity_at ? formatDate(user.last_activity_at) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveUser(user.id)}
+                          disabled={updatingUserId === user.id}
+                        >
+                          Remove
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
