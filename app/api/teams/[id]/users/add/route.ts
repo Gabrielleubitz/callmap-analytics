@@ -66,6 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const userDoc = usersSnapshot.docs[0]
     const userRef = db.collection('users').doc(userDoc.id)
 
+    // Update user profile with workspace metadata (legacy / analytics views)
     await userRef.update({
       workspaceId: teamId,
       teamId,
@@ -73,6 +74,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       status: 'active',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     })
+
+    // Also add to workspace members subcollection, which is the primary
+    // source of truth in the mindmap app.
+    const memberRef = db
+      .collection('workspaces')
+      .doc(teamId)
+      .collection('members')
+      .doc(userDoc.id)
+
+    await memberRef.set(
+      {
+        userId: userDoc.id,
+        role,
+        joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
 
     return NextResponse.json({ success: true, userId: userDoc.id })
   } catch (error: any) {

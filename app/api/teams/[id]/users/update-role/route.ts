@@ -47,25 +47,33 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
     }
 
-    const userRef = db.collection('users').doc(userId)
-    const userDoc = await userRef.get()
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    // Ensure workspace membership exists
+    const memberRef = db
+      .collection('workspaces')
+      .doc(teamId)
+      .collection('members')
+      .doc(userId)
+    const memberDoc = await memberRef.get()
 
-    const data = userDoc.data() || {}
-    const currentTeamId = data.workspaceId || data.teamId
-    if (currentTeamId !== teamId) {
+    if (!memberDoc.exists) {
       return NextResponse.json(
         { error: 'User is not a member of this team' },
-        { status: 400 }
+        { status: 404 }
       )
     }
 
-    await userRef.update({
-      role,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    })
+    // Update workspace member role (source of truth for workspace)
+    await memberRef.update({ role })
+
+    // Also reflect role on user document for analytics / legacy queries
+    const userRef = db.collection('users').doc(userId)
+    const userDoc = await userRef.get()
+    if (userDoc.exists) {
+      await userRef.update({
+        role,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
