@@ -151,13 +151,14 @@ RULES:
 - Talk ONLY about your domain (${agent.label}). If asked about anything else, say it is outside your scope.
 - Use the provided JSON context and DO NOT invent data.
 - Be concise and actionable.
+- IMPORTANT: Respond with a SINGLE raw JSON object only. Do NOT include markdown, backticks, code fences, or any extra text.
 
 DATA MODEL HINTS (do not repeat verbatim):
 - workspaces = teams; users belong to workspaces via members.
 - mindmaps + processingJobs capture sessions and token usage.
 - billing data includes subscriptions, invoices, and payments.
 
-Respond in *valid JSON* with:
+Your entire response MUST be valid JSON of the form:
 {
   "summary": "1-3 sentence overview from your expert lens",
   "keyMetrics": [
@@ -216,9 +217,24 @@ Respond in *valid JSON* with:
 
   let parsed: any = null
   if (content) {
+    // Clean up common patterns like ```json ... ``` so we can still parse reliably
+    let cleaned = content.trim()
+    if (cleaned.startsWith('```')) {
+      const firstNewline = cleaned.indexOf('\n')
+      const lastFence = cleaned.lastIndexOf('```')
+      if (firstNewline !== -1 && lastFence > firstNewline) {
+        cleaned = cleaned.slice(firstNewline + 1, lastFence).trim()
+      }
+      // Strip optional language hint like `json`
+      if (cleaned.toLowerCase().startsWith('json')) {
+        cleaned = cleaned.slice(4).trim()
+      }
+    }
+
     try {
-      parsed = JSON.parse(content)
+      parsed = JSON.parse(cleaned)
     } catch (error) {
+      // Fall back to treating the whole content as a plain-text summary
       parsed = { summary: content, keyMetrics: [], recommendations: [] }
     }
   }
