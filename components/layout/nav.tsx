@@ -27,9 +27,13 @@ export function Nav() {
         <div className="flex h-16 items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-soft flex items-center justify-center text-xs font-bold text-white">
-                CM
+            <Link href="/" className="flex items-center gap-3">
+              <div className="relative h-8 w-8 overflow-hidden rounded-md bg-white shadow-soft">
+                <img
+                  src="/callmap-logo.png"
+                  alt="CallMap"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold tracking-tight gradient-text">
@@ -106,4 +110,5 @@ export function Nav() {
     </nav>
   )
 }
+
 

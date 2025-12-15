@@ -1,3 +1,4 @@
+
 # CallMap Admin Dashboard
 
 Internal admin dashboard for CallMap - an AI product that ingests calls, meetings, and uploads, and turns them into structured mind maps and summaries.
