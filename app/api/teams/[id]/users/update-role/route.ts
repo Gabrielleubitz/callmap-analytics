@@ -3,11 +3,14 @@ import { adminDb } from '@/lib/firebase-admin'
 import { verifySessionCookie } from '@/lib/auth/session'
 import { cookies } from 'next/headers'
 import * as admin from 'firebase-admin'
+import { captureException } from '@/lib/support/capture-error'
 
 /**
  * Update a user's role within a team/workspace.
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  let decodedToken: any = null
+  let body: any = {}
   try {
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('callmap_session')?.value
@@ -16,7 +19,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let decodedToken
     try {
       decodedToken = await verifySessionCookie(sessionCookie)
     } catch {
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const db = adminDb
     const teamId = params.id
-    const body = await request.json()
+    body = await request.json()
     const userId = body.userId as string | undefined
     const role = body.role as string | undefined
 
@@ -78,6 +80,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('[teams/users/update-role] Error:', error)
+    
+    // Capture error for support
+    try {
+      captureException(error, {
+        app_area: 'invite_permissions',
+        route: request.url,
+        action: 'update_user_role',
+        user_id: decodedToken?.uid || null,
+        workspace_id: params.id,
+        source: 'server',
+        metadata: {
+          target_user_id: body.userId,
+          new_role: body.role,
+        },
+      })
+    } catch (captureErr) {
+      // Ignore capture errors
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to update user role' },
       { status: 500 }

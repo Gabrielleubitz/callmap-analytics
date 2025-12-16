@@ -444,6 +444,7 @@ Your entire response MUST be valid JSON of the form:
 }
 
 export async function POST(request: NextRequest) {
+  let decodedToken: any = null
   try {
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('callmap_session')?.value
@@ -452,7 +453,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
+    decodedToken = await verifySessionCookie(sessionCookie)
 
     if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
       return NextResponse.json(
@@ -489,6 +490,17 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[AI Agents] Error:', error)
+    
+    // Capture error for support
+    const { captureException } = await import('@/lib/support/capture-error')
+    captureException(error, {
+      app_area: 'ai_generation',
+      route: request.url,
+      action: 'run_ai_agents',
+      user_id: decodedToken?.uid || null,
+      source: 'server',
+    })
+    
     return NextResponse.json(
       { error: error.message || 'Failed to generate AI agent reports' },
       { status: 500 }

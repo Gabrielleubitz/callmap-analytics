@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { formatDateTime } from "@/lib/utils"
 import { useApiData } from "@/lib/hooks/useApiData"
-import { getJourney, searchUsers, type UserSearchResult } from "@/lib/db"
+import { getJourney, searchUsers, searchTeams, type UserSearchResult, type TeamSearchResult } from "@/lib/db"
 import type { DateRange } from "@/lib/types"
 import { Upload, Zap, Edit, Download, AlertTriangle, TrendingUp, MessageSquare, XCircle } from "lucide-react"
 
@@ -44,7 +44,7 @@ export default function JourneysPage() {
   const [entityType, setEntityType] = useState<'user' | 'team'>('user')
   const [entityId, setEntityId] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
+  const [searchResults, setSearchResults] = useState<(UserSearchResult | TeamSearchResult)[]>([])
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [searching, setSearching] = useState(false)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
@@ -57,7 +57,7 @@ export default function JourneysPage() {
 
   // Auto-search as user types (optional - can be disabled if manual search is preferred)
   useEffect(() => {
-    if (entityType !== 'user' || !searchQuery || searchQuery.length < 2) {
+    if (!searchQuery || searchQuery.length < 2) {
       // Don't clear results immediately, let user see them
       return
     }
@@ -72,8 +72,10 @@ export default function JourneysPage() {
       setSearching(true)
       setShowSearchResults(true)
       try {
-        console.log('[Journey Search] Auto-searching for:', searchQuery)
-        const results = await searchUsers(searchQuery, 10)
+        console.log('[Journey Search] Auto-searching for:', searchQuery, 'type:', entityType)
+        const results = entityType === 'user' 
+          ? await searchUsers(searchQuery, 10)
+          : await searchTeams(searchQuery, 10)
         console.log('[Journey Search] Auto-search results:', results)
         setSearchResults(results)
       } catch (error) {
@@ -111,8 +113,10 @@ export default function JourneysPage() {
     setSearching(true)
     setShowSearchResults(true)
     try {
-      console.log('[Journey Search] Manual search for:', searchQuery)
-      const results = await searchUsers(searchQuery, 10)
+      console.log('[Journey Search] Manual search for:', searchQuery, 'type:', entityType)
+      const results = entityType === 'user'
+        ? await searchUsers(searchQuery, 10)
+        : await searchTeams(searchQuery, 10)
       console.log('[Journey Search] Results:', results)
       setSearchResults(results)
       if (results.length === 0) {
@@ -129,6 +133,12 @@ export default function JourneysPage() {
   const handleUserSelect = (user: UserSearchResult) => {
     setEntityId(user.id)
     setSearchQuery(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email)
+    setShowSearchResults(false)
+  }
+
+  const handleTeamSelect = (team: TeamSearchResult) => {
+    setEntityId(team.id)
+    setSearchQuery(team.name)
     setShowSearchResults(false)
   }
 
@@ -178,7 +188,7 @@ export default function JourneysPage() {
 
             <div ref={searchRef} className="relative">
               <Label htmlFor="entityId">
-                {entityType === 'user' ? 'User (Name or Email)' : 'Team ID'}
+                {entityType === 'user' ? 'User (Name or Email)' : 'Team (Name or ID)'}
               </Label>
               {entityType === 'user' ? (
                 <>
@@ -229,17 +239,114 @@ export default function JourneysPage() {
                   </div>
                   {showSearchResults && searchResults.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {searchResults.map((user) => {
-                        const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email
+                      {searchResults.map((result) => {
+                        if (entityType === 'user') {
+                          const user = result as UserSearchResult
+                          const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => handleUserSelect(user)}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-gray-900">{displayName}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                            </button>
+                          )
+                        } else {
+                          const team = result as TeamSearchResult
+                          return (
+                            <button
+                              key={team.id}
+                              type="button"
+                              onClick={() => handleTeamSelect(team)}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-gray-900">{team.name}</div>
+                              <div className="text-sm text-gray-500">ID: {team.id}</div>
+                            </button>
+                          )
+                        }
+                      })}
+                    </div>
+                  )}
+                  {searchQuery && searchQuery.length >= 2 && !searching && searchResults.length === 0 && showSearchResults && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-sm text-gray-500">
+                      No {entityType === 'user' ? 'users' : 'teams'} found matching &quot;{searchQuery}&quot;. Check the browser console and server logs for details.
+                    </div>
+                  )}
+                  {searchQuery && searchQuery.length >= 2 && !searching && !showSearchResults && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Press Enter or click Search to find {entityType === 'user' ? 'users' : 'teams'}
+                    </p>
+                  )}
+                  {entityId && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Selected {entityType === 'user' ? 'User' : 'Team'} ID: {entityId}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex gap-2 mt-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        id="entityId"
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          if (!e.target.value) {
+                            setEntityId('')
+                            setSearchResults([])
+                            setShowSearchResults(false)
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleManualSearch()
+                          }
+                        }}
+                        onFocus={() => {
+                          if (searchResults.length > 0) {
+                            setShowSearchResults(true)
+                          }
+                        }}
+                        placeholder="Search by name or enter team ID..."
+                        className="pr-10"
+                      />
+                      {searching && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleManualSearch}
+                      disabled={!searchQuery || searchQuery.length < 2 || searching}
+                      className="whitespace-nowrap"
+                    >
+                      {searching ? 'Searching...' : 'Search'}
+                    </Button>
+                  </div>
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {searchResults.map((team) => {
+                        const t = team as TeamSearchResult
                         return (
                           <button
-                            key={user.id}
+                            key={t.id}
                             type="button"
-                            onClick={() => handleUserSelect(user)}
+                            onClick={() => handleTeamSelect(t)}
                             className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                           >
-                            <div className="font-medium text-gray-900">{displayName}</div>
-                            <div className="text-sm text-gray-500">{user.email}</div>
+                            <div className="font-medium text-gray-900">{t.name}</div>
+                            <div className="text-sm text-gray-500">ID: {t.id}</div>
                           </button>
                         )
                       })}
@@ -247,28 +354,29 @@ export default function JourneysPage() {
                   )}
                   {searchQuery && searchQuery.length >= 2 && !searching && searchResults.length === 0 && showSearchResults && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-sm text-gray-500">
-                      No users found matching &quot;{searchQuery}&quot;. Check the browser console and server logs for details.
+                      No teams found matching &quot;{searchQuery}&quot;. Check the browser console and server logs for details.
                     </div>
                   )}
                   {searchQuery && searchQuery.length >= 2 && !searching && !showSearchResults && (
                     <p className="mt-1 text-xs text-gray-400">
-                      Press Enter or click Search to find users
+                      Press Enter or click Search to find teams
                     </p>
                   )}
                   {entityId && (
                     <p className="mt-1 text-xs text-gray-500">
-                      Selected User ID: {entityId}
+                      Selected Team ID: {entityId}
                     </p>
                   )}
+                  {/* Allow direct ID entry */}
+                  <div className="mt-2">
+                    <Input
+                      value={entityId}
+                      onChange={(e) => setEntityId(e.target.value)}
+                      placeholder="Or enter team ID directly"
+                      className="text-xs"
+                    />
+                  </div>
                 </>
-              ) : (
-                <Input
-                  id="entityId"
-                  value={entityId}
-                  onChange={(e) => setEntityId(e.target.value)}
-                  placeholder="Enter team ID"
-                  className="mt-2"
-                />
               )}
             </div>
 

@@ -193,10 +193,10 @@ export interface AuditLog {
 
 // API Response types
 export interface PaginatedResponse<T> {
-  data: T[]
+  items: T[]
   total: number
-  page?: number
-  pageSize?: number
+  page: number
+  pageSize: number
 }
 
 export interface OverviewMetrics {
@@ -275,5 +275,89 @@ export interface UserUpdatePayload {
   audioMinutesUsed?: number
   mapsGenerated?: number
   monthlyResetTimestamp?: string // ISO string
+}
+
+// Support & Error Intelligence types
+export type ErrorSeverity = 'info' | 'warning' | 'critical'
+export type TriageStatus = 'pending' | 'processing' | 'done' | 'ignored' | 'escalated'
+export type ResolutionType = 'user_action' | 'engineering_fix' | 'config_change' | 'ignored'
+export type ErrorSource = 'client' | 'server' | 'worker' | 'cron'
+
+export interface SupportErrorEvent {
+  id: string
+  // Error details
+  message: string
+  stack?: string | null
+  error_code?: string | null
+  app_area: string // e.g., 'mindmap_creation', 'upload', 'export', 'billing', 'ai_generation'
+  route?: string | null
+  action?: string | null
+  
+  // Classification (automatic)
+  expected: boolean
+  critical: boolean
+  severity: ErrorSeverity
+  
+  // Context
+  user_id: string | null
+  workspace_id: string | null
+  source: ErrorSource
+  
+  // Resolution state
+  triage_status: TriageStatus
+  acknowledged_at: Date | null
+  resolved_at: Date | null
+  resolution_type: ResolutionType | null
+  resolution_notes: string | null
+  resolved_by: string | null // admin user ID
+  
+  // Aggregation
+  occurrence_count: number
+  first_seen_at: Date
+  last_seen_at: Date
+  
+  // Metadata
+  metadata: Record<string, any> | null
+  created_at: Date
+  updated_at: Date
+}
+
+export interface SupportErrorTriage {
+  id: string
+  error_id: string
+  // AI analysis
+  summary: string
+  probable_causes: string[]
+  recommended_fixes: string[]
+  who_should_act: 'user' | 'support' | 'engineering'
+  confidence: number // 0-1
+  customer_facing_message: string
+  // KB matches
+  kb_entry_ids: string[]
+  created_at: Date
+}
+
+export interface SupportErrorKB {
+  id: string
+  // Pattern matching
+  error_pattern: string // regex or keyword match
+  symptoms: string[]
+  app_area?: string | null
+  
+  // Classification override
+  expected: boolean
+  critical: boolean
+  severity: ErrorSeverity
+  
+  // Resolution
+  root_causes: string[]
+  fix_steps: string[]
+  customer_message_template: string
+  
+  // Metadata
+  created_by: string // admin user ID
+  created_at: Date
+  updated_at: Date
+  usage_count: number
 }
 

@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase-admin'
 import { verifySessionCookie } from '@/lib/auth/session'
 import { cookies } from 'next/headers'
 import * as admin from 'firebase-admin'
+import { captureException } from '@/lib/support/capture-error'
 
 /**
  * Add an existing user (by email) to a team/workspace.
@@ -12,6 +13,8 @@ import * as admin from 'firebase-admin'
  * - Optionally updates role
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  let decodedToken: any = null
+  let body: any = {}
   try {
     const cookieStore = await cookies()
     const sessionCookie = cookieStore.get('callmap_session')?.value
@@ -20,7 +23,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let decodedToken
     try {
       decodedToken = await verifySessionCookie(sessionCookie)
     } catch {
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const db = adminDb
     const teamId = params.id
-    const body = await request.json()
+    body = await request.json()
     const email = (body.email || '').toLowerCase().trim()
     const role = body.role || 'member'
 
@@ -95,6 +97,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ success: true, userId: userDoc.id })
   } catch (error: any) {
     console.error('[teams/users/add] Error:', error)
+    
+    // Capture error for support
+    try {
+      captureException(error, {
+        app_area: 'invite_permissions',
+        route: request.url,
+        action: 'add_user_to_workspace',
+        user_id: decodedToken?.uid || null,
+        workspace_id: params.id,
+        source: 'server',
+        metadata: {
+          email: body.email,
+          role: body.role,
+        },
+      })
+    } catch (captureErr) {
+      // Ignore capture errors
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to add user to team' },
       { status: 500 }

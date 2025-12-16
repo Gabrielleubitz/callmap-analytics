@@ -50,6 +50,9 @@ export const FIRESTORE_COLLECTIONS = {
   webhookLogs: 'webhookLogs',
   auditLogs: 'auditLogs',
   usage: 'usage', // Subcollection under users
+  supportErrors: 'support_error_events',
+  supportErrorTriage: 'support_error_triage',
+  supportErrorKB: 'support_error_kb',
 } as const
 
 /**

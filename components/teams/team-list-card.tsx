@@ -7,7 +7,8 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronDown, ChevronUp, Users, Calendar, Globe } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Users, Calendar, Globe, Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { TeamDetailsPanel } from "./team-details-panel"
 import { formatDateTime } from "@/lib/utils"
@@ -32,6 +33,17 @@ interface TeamListCardProps {
 
 export function TeamListCard({ team }: TeamListCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyTeamId = async () => {
+    try {
+      await navigator.clipboard.writeText(team.id)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy team ID:', error)
+    }
+  }
 
   const planColors: Record<string, string> = {
     free: "bg-gray-100 text-gray-700",
@@ -59,6 +71,19 @@ export function TeamListCard({ team }: TeamListCardProps) {
               >
                 {team.name || "Unnamed Team"}
               </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={handleCopyTeamId}
+                title="Copy Team ID to clipboard"
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5 text-gray-400" />
+                )}
+              </Button>
               {team.plan && (
                 <Badge className={planColors[team.plan] || planColors.free}>
                   {team.plan}

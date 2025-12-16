@@ -1012,14 +1012,55 @@ export async function searchUsers(query: string, limit = 10): Promise<UserSearch
       console.error('[searchUsers] API returned null - check server logs for errors')
       return []
     }
-    // PaginatedResponse already has the correct structure
-    if (!result.data || !Array.isArray(result.data)) {
+    // PaginatedResponse uses 'items' not 'data'
+    if (!result.items || !Array.isArray(result.items)) {
       console.error('[searchUsers] Invalid data format:', result)
       return []
     }
-    return result.data
+    return result.items
   } catch (error) {
     console.error('[searchUsers] Error:', error)
+    return []
+  }
+}
+
+export interface TeamSearchResult {
+  id: string
+  name: string
+  slug?: string
+}
+
+export async function searchTeams(query: string, limit = 10): Promise<TeamSearchResult[]> {
+  try {
+    console.log('[searchTeams] Calling API with query:', query)
+    const result = await apiRequest<PaginatedResponse<TeamSearchResult>>(
+      '/api/teams',
+      {
+        method: 'POST',
+        body: JSON.stringify({ 
+          page: 1, 
+          pageSize: limit,
+          search: query,
+        }),
+      }
+    )
+    console.log('[searchTeams] API result:', result)
+    if (!result) {
+      console.error('[searchTeams] API returned null - check server logs for errors')
+      return []
+    }
+    // PaginatedResponse uses 'items' not 'data'
+    if (!result.items || !Array.isArray(result.items)) {
+      console.error('[searchTeams] Invalid data format:', result)
+      return []
+    }
+    return result.items.map(team => ({
+      id: team.id,
+      name: team.name,
+      slug: team.slug,
+    }))
+  } catch (error) {
+    console.error('[searchTeams] Error:', error)
     return []
   }
 }

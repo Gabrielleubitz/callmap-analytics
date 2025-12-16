@@ -112,6 +112,15 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[Usage Metrics] Error:', error)
     
+    // Capture error for support
+    const { captureException } = await import('@/lib/support/capture-error')
+    captureException(error, {
+      app_area: 'billing',
+      route: request.url,
+      action: 'calculate_usage_metrics',
+      source: 'server',
+    })
+    
     if (error.name === 'ZodError') {
       return errorResponse('Data validation failed', 500, error.errors, 'VALIDATION_ERROR')
     }

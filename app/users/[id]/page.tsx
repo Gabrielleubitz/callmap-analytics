@@ -41,6 +41,8 @@ export default function UserDetailPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [isGrantingAccess, setIsGrantingAccess] = useState(false)
   const [userIsAdmin, setUserIsAdmin] = useState(false)
+  const [userErrors, setUserErrors] = useState<any[]>([])
+  const [errorsLoading, setErrorsLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -83,6 +85,28 @@ export default function UserDetailPage() {
         console.error("Error loading wallet transactions:", error)
       } finally {
         setWalletLoading(false)
+      }
+
+      // Load user errors
+      try {
+        setErrorsLoading(true)
+        const response = await fetch('/api/support/errors/list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            page: 1,
+            pageSize: 20,
+            user_id: userId,
+          }),
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setUserErrors(data.data || [])
+        }
+      } catch (err) {
+        console.error('[UserDetail] Failed to load errors:', err)
+      } finally {
+        setErrorsLoading(false)
       }
     }
     if (userId) load()
@@ -529,9 +553,28 @@ export default function UserDetailPage() {
                     }
                     setIsAdjusting(true)
                     try {
+                      // Get CSRF token
+                      let csrfToken = ''
+                      try {
+                        const csrfResponse = await fetch('/api/auth/csrf-token')
+                        if (csrfResponse.ok) {
+                          const csrfData = await csrfResponse.json()
+                          csrfToken = csrfData.csrfToken || ''
+                        }
+                      } catch (csrfError) {
+                        console.error('Failed to get CSRF token:', csrfError)
+                      }
+
+                      const headers: Record<string, string> = {
+                        "Content-Type": "application/json",
+                      }
+                      if (csrfToken) {
+                        headers['X-CSRF-Token'] = csrfToken
+                      }
+
                       const response = await fetch(`/api/admin/wallet/${userId}/adjust`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers,
                         body: JSON.stringify({
                           amount,
                           note: adjustNote || "Manual adjustment by admin",
@@ -692,6 +735,73 @@ export default function UserDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Errors */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Errors</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {errorsLoading ? (
+            <div className="text-center text-gray-500 py-4">Loading errors...</div>
+          ) : userErrors.length === 0 ? (
+            <div className="text-center text-gray-500 py-4">No errors found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>App Area</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Expected</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Seen</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {userErrors.map((err) => (
+                  <TableRow key={err.id}>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          err.severity === 'critical'
+                            ? 'destructive'
+                            : err.severity === 'warning'
+                            ? 'default'
+                            : 'outline'
+                        }
+                      >
+                        {err.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{err.app_area}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/support/errors/${err.id}`}
+                        className="text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        {err.message.substring(0, 50)}
+                        {err.message.length > 50 ? '...' : ''}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {err.expected ? (
+                        <Badge variant="outline">Expected</Badge>
+                      ) : (
+                        <Badge variant="default">Unexpected</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{err.triage_status}</Badge>
+                    </TableCell>
+                    <TableCell>{formatDate(err.last_seen_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Audit Log */}
       <Card>

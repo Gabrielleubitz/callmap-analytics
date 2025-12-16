@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LogoutButton } from "@/components/auth/logout-button"
+import { ErrorNotificationBell } from "@/components/support/error-notification-bell"
 
 const primaryNavItems = [
   { href: "/", label: "Overview" },
@@ -13,6 +14,7 @@ const primaryNavItems = [
   { href: "/billing", label: "Billing" },
   { href: "/ops", label: "Ops" },
   { href: "/admin/ai-agents", label: "AI Agents" },
+  { href: "/support/errors", label: "Support" },
 ]
 
 const secondaryNavItems = [
@@ -120,6 +122,7 @@ export function Nav() {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
+            <ErrorNotificationBell />
             <span className="hidden text-xs text-slate-500 md:inline-flex">
               Secure admin
             </span>
