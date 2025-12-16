@@ -101,7 +101,7 @@ export default function UserDetailPage() {
         })
         if (response.ok) {
           const data = await response.json()
-          setUserErrors(data.data || [])
+          setUserErrors(data.items || data.data || [])
         }
       } catch (err) {
         console.error('[UserDetail] Failed to load errors:', err)

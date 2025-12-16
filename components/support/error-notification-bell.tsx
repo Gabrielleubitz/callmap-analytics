@@ -37,7 +37,8 @@ export function ErrorNotificationBell() {
 
         if (response.ok) {
           const data = await response.json()
-          const unexpectedCritical = data.data.filter(
+          const errors = data.items || data.data || []
+          const unexpectedCritical = errors.filter(
             (e: ErrorNotification) => !e.expected || e.critical
           )
           setCount(unexpectedCritical.length)

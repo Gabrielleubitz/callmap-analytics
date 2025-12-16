@@ -53,8 +53,8 @@ export default function SupportErrorsPage() {
       }
 
       const data = await response.json()
-      setErrors(data.data)
-      setTotal(data.total)
+      setErrors(data.items || data.data || [])
+      setTotal(data.total || 0)
     } catch (err: any) {
       setError(err.message)
     } finally {

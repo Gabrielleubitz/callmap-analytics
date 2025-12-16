@@ -53,38 +53,63 @@ export async function POST(request: NextRequest) {
       unresolved_only = false,
     } = body
 
-    let query: admin.firestore.Query = adminDb
-      .collection(FIRESTORE_COLLECTIONS.supportErrors)
+    let snapshot: admin.firestore.QuerySnapshot
+    let filterCount = 0
+    try {
+      let query: admin.firestore.Query = adminDb
+        .collection(FIRESTORE_COLLECTIONS.supportErrors)
 
-    // Apply filters
-    if (expected !== undefined) {
-      query = query.where('expected', '==', expected)
-    }
-    if (critical !== undefined) {
-      query = query.where('critical', '==', critical)
-    }
-    if (severity) {
-      query = query.where('severity', '==', severity as ErrorSeverity)
-    }
-    if (app_area) {
-      query = query.where('app_area', '==', app_area)
-    }
-    if (user_id) {
-      query = query.where('user_id', '==', user_id)
-    }
-    if (workspace_id) {
-      query = query.where('workspace_id', '==', workspace_id)
-    }
-    if (triage_status) {
-      query = query.where('triage_status', '==', triage_status as TriageStatus)
-    } else if (unresolved_only) {
-      query = query.where('triage_status', 'in', ['pending', 'processing'])
-    }
+      // Count how many filters we're applying
+      if (expected !== undefined) {
+        query = query.where('expected', '==', expected)
+        filterCount++
+      }
+      if (critical !== undefined) {
+        query = query.where('critical', '==', critical)
+        filterCount++
+      }
+      if (severity) {
+        query = query.where('severity', '==', severity as ErrorSeverity)
+        filterCount++
+      }
+      if (app_area) {
+        query = query.where('app_area', '==', app_area)
+        filterCount++
+      }
+      if (user_id) {
+        query = query.where('user_id', '==', user_id)
+        filterCount++
+      }
+      if (workspace_id) {
+        query = query.where('workspace_id', '==', workspace_id)
+        filterCount++
+      }
+      if (triage_status) {
+        query = query.where('triage_status', '==', triage_status as TriageStatus)
+        filterCount++
+      } else if (unresolved_only) {
+        query = query.where('triage_status', 'in', ['pending', 'processing'])
+        filterCount++
+      }
 
-    // Order by last seen (most recent first)
-    query = query.orderBy('last_seen_at', 'desc')
+      // Only add orderBy if we have 0-1 filters (to avoid composite index requirement)
+      // If we have more filters, we'll sort in memory
+      const needsInMemorySort = filterCount > 1
+      if (!needsInMemorySort) {
+        query = query.orderBy('last_seen_at', 'desc')
+      }
 
-    const snapshot = await query.get()
+      snapshot = await query.get()
+    } catch (queryError: any) {
+      // If query fails (e.g., missing index, collection doesn't exist), return empty results
+      console.error('[Support Errors] Query error (may need Firestore index):', queryError)
+      return NextResponse.json({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: pageSize,
+      })
+    }
     
     let errors = snapshot.docs.map(doc => {
       const data = doc.data()
@@ -100,6 +125,16 @@ export async function POST(request: NextRequest) {
       } as SupportErrorEvent
     })
 
+    // Sort by last_seen_at if we didn't use Firestore orderBy (when we have 2+ filters)
+    const needsInMemorySort = filterCount > 1
+    if (needsInMemorySort) {
+      errors.sort((a, b) => {
+        const aTime = a.last_seen_at?.getTime() || 0
+        const bTime = b.last_seen_at?.getTime() || 0
+        return bTime - aTime // Descending (most recent first)
+      })
+    }
+
     // Paginate
     const total = errors.length
     const startIndex = (page - 1) * pageSize
@@ -107,7 +142,7 @@ export async function POST(request: NextRequest) {
     const paginatedErrors = errors.slice(startIndex, endIndex)
 
     return NextResponse.json({
-      data: paginatedErrors,
+      items: paginatedErrors,
       total,
       page,
       pageSize,
