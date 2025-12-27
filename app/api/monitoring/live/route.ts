@@ -107,12 +107,32 @@ export async function GET(request: NextRequest) {
     const errorRate = recentErrorsSnapshot.docs.length
 
     // Get recent activity feed (last 20 events)
-    const recentEventsSnapshot = await adminDb
-      .collection('analyticsEvents')
-      .orderBy('timestamp', 'desc')
-      .limit(20)
-      .get()
-      .catch(() => ({ docs: [] } as any))
+    let recentEventsSnapshot
+    try {
+      recentEventsSnapshot = await adminDb
+        .collection('analyticsEvents')
+        .orderBy('timestamp', 'desc')
+        .limit(20)
+        .get()
+    } catch (indexError: any) {
+      // If index doesn't exist, fetch all and sort in memory
+      console.warn('[Monitoring Live] Missing Firestore index, using fallback:', indexError.message)
+      const allEvents = await adminDb
+        .collection('analyticsEvents')
+        .limit(100)
+        .get()
+      
+      // Sort by timestamp in memory
+      const sorted = allEvents.docs.sort((a, b) => {
+        const aTime = a.data().timestamp?.toMillis?.() || 0
+        const bTime = b.data().timestamp?.toMillis?.() || 0
+        return bTime - aTime
+      })
+      
+      recentEventsSnapshot = {
+        docs: sorted.slice(0, 20),
+      } as any
+    }
 
     const recentActivity = recentEventsSnapshot.docs.map((doc: any) => {
       const data = doc.data()

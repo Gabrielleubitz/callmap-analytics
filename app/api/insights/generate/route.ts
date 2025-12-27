@@ -156,12 +156,54 @@ export async function POST(request: NextRequest) {
     // Generate AI insights
     const insights: Insight[] = []
 
-    // Summary insight
+    // Generate AI-powered summary
+    const openai = getOpenAIClient()
+    let summaryDescription = `In the last ${period === 'daily' ? '24 hours' : '7 days'}, ${mindmapsSnapshot.size} mindmaps were created, ${totalTokens.toLocaleString()} tokens were used (cost: $${totalCost.toFixed(2)}), and ${usersSnapshot.size} total users are active.`
+    
+    if (openai) {
+      try {
+        const summaryPrompt = `You are an analytics expert for CallMap, a SaaS platform that generates AI-powered mindmaps.
+
+Generate a concise, insightful ${period === 'daily' ? 'daily' : 'weekly'} summary based on these metrics:
+
+- Mindmaps created: ${mindmapsSnapshot.size} (${mindmapsChange > 0 ? '+' : ''}${mindmapsChange.toFixed(1)}% vs previous period)
+- Tokens used: ${totalTokens.toLocaleString()} (${tokensChange > 0 ? '+' : ''}${tokensChange.toFixed(1)}% vs previous period)
+- Cost: $${totalCost.toFixed(2)}
+- Job failure rate: ${(jobFailureRate * 100).toFixed(1)}%
+- Total active users: ${usersSnapshot.size}
+${anomalies.length > 0 ? `- Anomalies detected: ${anomalies.length}` : ''}
+
+Provide a 2-3 sentence summary that highlights key insights and trends. Be specific and data-driven. Return as JSON: {"summary": "your summary text"}`
+
+        const summaryCompletion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: summaryPrompt }],
+          response_format: { type: 'json_object' },
+          temperature: 0.5,
+        })
+
+        const summaryResponse = summaryCompletion.choices[0].message.content
+        if (summaryResponse) {
+          try {
+            const parsed = JSON.parse(summaryResponse)
+            if (parsed.summary) {
+              summaryDescription = parsed.summary
+            }
+          } catch (parseError) {
+            console.error('[Insights] Failed to parse AI summary:', parseError)
+          }
+        }
+      } catch (summaryError) {
+        console.error('[Insights] AI summary generation failed:', summaryError)
+        // Fall back to default summary
+      }
+    }
+
     insights.push({
       id: `summary-${now.toISOString()}`,
       type: 'summary',
       title: `${period === 'daily' ? 'Daily' : 'Weekly'} Summary`,
-      description: `In the last ${period === 'daily' ? '24 hours' : '7 days'}, ${mindmapsSnapshot.size} mindmaps were created, ${totalTokens.toLocaleString()} tokens were used (cost: $${totalCost.toFixed(2)}), and ${usersSnapshot.size} total users are active.`,
+      description: summaryDescription,
       metrics: {
         mindmaps: mindmapsSnapshot.size,
         tokens: totalTokens,
@@ -227,11 +269,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate AI recommendations
-    try {
-      const openai = getOpenAIClient()
-      if (!openai) {
-        console.warn('[Insights] OpenAI API key not configured, skipping AI recommendations')
-      } else {
+    if (openai) {
+      try {
         const prompt = `You are an analytics expert for CallMap, a SaaS platform that generates AI-powered mindmaps.
 
 Current metrics for the last ${period}:
@@ -272,11 +311,11 @@ Provide 2-3 actionable recommendations for improving the business. Be specific a
               console.error('[Insights] Failed to parse AI response:', parseError)
             }
           }
-        }
       } catch (aiError) {
         console.error('[Insights] AI generation failed:', aiError)
         // Continue without AI recommendations
       }
+    }
 
     // Store insights in cache
     const insightsRef = adminDb.collection(FIRESTORE_COLLECTIONS.insights).doc()
@@ -323,13 +362,37 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') || 'daily'
 
-    // Get most recent insights
-    const insightsSnapshot = await adminDb
-      .collection(FIRESTORE_COLLECTIONS.insights)
-      .where('period', '==', period)
-      .orderBy('generated_at', 'desc')
-      .limit(1)
-      .get()
+    // Get most recent insights (handle missing index gracefully)
+    let insightsSnapshot
+    try {
+      insightsSnapshot = await adminDb
+        .collection(FIRESTORE_COLLECTIONS.insights)
+        .where('period', '==', period)
+        .orderBy('generated_at', 'desc')
+        .limit(1)
+        .get()
+    } catch (indexError: any) {
+      // If index doesn't exist, fetch all and sort in memory
+      console.warn('[Insights] Missing Firestore index, using fallback:', indexError.message)
+      const allInsights = await adminDb
+        .collection(FIRESTORE_COLLECTIONS.insights)
+        .where('period', '==', period)
+        .get()
+      
+      if (allInsights.empty) {
+        return NextResponse.json({ data: [] })
+      }
+      
+      // Sort by generated_at in memory
+      const sorted = allInsights.docs.sort((a, b) => {
+        const aTime = a.data().generated_at?.toMillis?.() || 0
+        const bTime = b.data().generated_at?.toMillis?.() || 0
+        return bTime - aTime
+      })
+      
+      const insightsData = sorted[0].data()
+      return NextResponse.json({ data: insightsData.insights || [] })
+    }
 
     if (insightsSnapshot.empty) {
       return NextResponse.json({ data: [] })
