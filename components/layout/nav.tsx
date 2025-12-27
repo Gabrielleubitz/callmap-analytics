@@ -8,6 +8,7 @@ import { ErrorNotificationBell } from "@/components/support/error-notification-b
 
 const primaryNavItems = [
   { href: "/", label: "Overview" },
+  { href: "/monitoring/live", label: "Live" },
   { href: "/teams", label: "Teams" },
   { href: "/users", label: "Users" },
   { href: "/usage", label: "Usage & Tokens" },
@@ -18,6 +19,17 @@ const primaryNavItems = [
 ]
 
 const secondaryNavItems = [
+  { href: "/insights", label: "Insights" },
+  { href: "/users/health", label: "User Health" },
+  { href: "/predictions/churn", label: "Churn Prediction" },
+  { href: "/predictions/revenue", label: "Revenue Forecast" },
+  { href: "/predictions/usage", label: "Usage Forecast" },
+  { href: "/revenue/optimization", label: "Revenue Optimization" },
+  { href: "/dashboards", label: "Dashboards" },
+  { href: "/analytics/chat", label: "AI Copilot" },
+  { href: "/reports", label: "Reports" },
+  { href: "/benchmarks", label: "Benchmarks" },
+  { href: "/monitoring/alerts", label: "Alerts" },
   { href: "/explorer", label: "Data Explorer" },
   { href: "/journeys", label: "Journeys" },
   { href: "/diagnostics", label: "Diagnostics" },

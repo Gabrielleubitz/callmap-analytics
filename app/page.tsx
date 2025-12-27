@@ -22,7 +22,7 @@ import { ErrorState } from "@/components/ui/error-state"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatNumber } from "@/lib/utils"
-import { DateRange, getOverviewMetrics, getDailyActiveUsers, getDailySessions, getDailyTokensByModel, getTokensByPlan, getTopTeamsByTokens, getTopTeamsByCost, getRecentlyCreatedTeams, getRecentlyFailedAIJobs, getMindmapGenerationTime, getMindmapEditCount, getFileConversionRate, getUserRetention, getMindmapFunnel, getExportRate, getCollaborationActivity, getTokenBurnByFeature, getMapEconomics, getBehaviorCohorts } from "@/lib/db"
+import { DateRange, getOverviewMetrics, getDailyActiveUsers, getDailySessions, getDailyTokensByModel, getTokensByPlan, getTopTeamsByTokens, getTopTeamsByCost, getRecentlyCreatedTeams, getRecentlyFailedAIJobs, getMindmapGenerationTime, getMindmapEditCount, getFileConversionRate, getUserRetention, getMindmapFunnel, getExportRate, getCollaborationActivity, getTokenBurnByFeature, getMapEconomics, getBehaviorCohorts, getActionItemsAnalytics, getCallLogsAnalytics, getContactsAnalytics, getMindmapContentAnalytics, getWorkspaceActivityAnalytics } from "@/lib/db"
 import { useApiData } from "@/lib/hooks/useApiData"
 import { HeroMetricCard } from "@/components/metrics/hero-metric-card"
 import { MetricGroupCard } from "@/components/metrics/metric-group-card"
@@ -74,6 +74,13 @@ export default function OverviewPage() {
   
   // Behavior Cohorts
   const behaviorCohorts = useApiData(() => getBehaviorCohorts(dateRange, 12), [dateRange])
+  
+  // New Feature Analytics
+  const actionItemsAnalytics = useApiData(() => getActionItemsAnalytics(dateRange), [dateRange])
+  const callLogsAnalytics = useApiData(() => getCallLogsAnalytics(dateRange), [dateRange])
+  const contactsAnalytics = useApiData(() => getContactsAnalytics(dateRange), [dateRange])
+  const mindmapContentAnalytics = useApiData(() => getMindmapContentAnalytics(dateRange), [dateRange])
+  const workspaceActivityAnalytics = useApiData(() => getWorkspaceActivityAnalytics(dateRange), [dateRange])
 
   // Calculate today's metrics and deltas
   const todayMetrics = useMemo(() => {
@@ -1467,6 +1474,289 @@ export default function OverviewPage() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* New Features Analytics Section */}
+      <div className="mt-8">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">New Features Analytics</h2>
+          <p className="text-gray-600 text-sm max-w-3xl">
+            Track usage of new features: Action Items, Call Logs, and Contact Integration. These metrics help you understand 
+            how users are engaging with productivity features and integrations.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Action Items Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Action Items</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Track action item creation, completion, calendar exports, and contact resolution.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {actionItemsAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : actionItemsAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load action items analytics"
+                  description={actionItemsAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !actionItemsAnalytics.data ? (
+                <EmptyState title="No data" description="No action items analytics available." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Created</span>
+                    <span className="font-semibold">{formatNumber(actionItemsAnalytics.data.totalCreated)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Completed</span>
+                    <span className="font-semibold">{formatNumber(actionItemsAnalytics.data.totalCompleted)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Completion Rate</span>
+                    <Badge variant={actionItemsAnalytics.data.completionRate >= 0.5 ? "default" : "secondary"}>
+                      {(actionItemsAnalytics.data.completionRate * 100).toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Added to Calendar</span>
+                    <span className="font-semibold">{formatNumber(actionItemsAnalytics.data.addedToCalendar)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Contact Resolved</span>
+                    <span className="font-semibold">{formatNumber(actionItemsAnalytics.data.contactResolved)}</span>
+                  </div>
+                  {Object.keys(actionItemsAnalytics.data.bySource || {}).length > 0 && (
+                    <div className="pt-2 border-t">
+                      <div className="text-xs text-gray-500 mb-2">By Source:</div>
+                      {Object.entries(actionItemsAnalytics.data.bySource).map(([source, count]) => (
+                        <div key={source} className="flex justify-between text-sm">
+                          <span className="capitalize">{source.replace(/_/g, ' ')}</span>
+                          <span>{formatNumber(count as number)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Call Logs Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Call Logs</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Track Net2Phone webhooks, recording processing, and transcription pipeline.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {callLogsAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : callLogsAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load call logs analytics"
+                  description={callLogsAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !callLogsAnalytics.data ? (
+                <EmptyState title="No data" description="No call logs analytics available." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Webhooks</span>
+                    <span className="font-semibold">{formatNumber(callLogsAnalytics.data.totalWebhooks)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Recordings Processed</span>
+                    <span className="font-semibold">{formatNumber(callLogsAnalytics.data.recordingsProcessed)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Transcriptions Started</span>
+                    <span className="font-semibold">{formatNumber(callLogsAnalytics.data.transcriptionsStarted)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Transcriptions Completed</span>
+                    <span className="font-semibold">{formatNumber(callLogsAnalytics.data.transcriptionsCompleted)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Mindmaps Created</span>
+                    <span className="font-semibold">{formatNumber(callLogsAnalytics.data.mindmapsCreated)}</span>
+                  </div>
+                  {Object.keys(callLogsAnalytics.data.byProvider || {}).length > 0 && (
+                    <div className="pt-2 border-t">
+                      <div className="text-xs text-gray-500 mb-2">By Provider:</div>
+                      {Object.entries(callLogsAnalytics.data.byProvider).map(([provider, count]) => (
+                        <div key={provider} className="flex justify-between text-sm">
+                          <span className="capitalize">{provider}</span>
+                          <span>{formatNumber(count as number)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Contacts Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact Integration</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Track Google Contacts searches, resolutions, actions, and email drafts.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {contactsAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : contactsAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load contacts analytics"
+                  description={contactsAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !contactsAnalytics.data ? (
+                <EmptyState title="No data" description="No contacts analytics available." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Searches</span>
+                    <span className="font-semibold">{formatNumber(contactsAnalytics.data.totalSearches)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Resolved</span>
+                    <span className="font-semibold">{formatNumber(contactsAnalytics.data.totalResolved)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Actions</span>
+                    <span className="font-semibold">{formatNumber(contactsAnalytics.data.totalActions)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Email Drafts Created</span>
+                    <span className="font-semibold">{formatNumber(contactsAnalytics.data.totalEmailDrafts)}</span>
+                  </div>
+                  {contactsAnalytics.data.totalSearches > 0 && (
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <span className="text-sm text-gray-600">Resolution Rate</span>
+                      <Badge variant={contactsAnalytics.data.totalResolved / contactsAnalytics.data.totalSearches >= 0.5 ? "default" : "secondary"}>
+                        {((contactsAnalytics.data.totalResolved / contactsAnalytics.data.totalSearches) * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Mindmap Content Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mindmap Content</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Analytics about mindmap structure, tags, and activity.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {mindmapContentAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : mindmapContentAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load mindmap content analytics"
+                  description={mindmapContentAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !mindmapContentAnalytics.data ? (
+                <EmptyState title="No data" description="No mindmap content analytics available." />
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600">Average Nodes per Mindmap</div>
+                      <div className="text-2xl font-bold">{formatNumber(mindmapContentAnalytics.data.averageNodesPerMindmap)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600">Total Nodes</div>
+                      <div className="text-2xl font-bold">{formatNumber(mindmapContentAnalytics.data.totalNodes)}</div>
+                    </div>
+                  </div>
+                  {mindmapContentAnalytics.data.tagDistribution.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-2">Top Tags</div>
+                      <div className="flex flex-wrap gap-2">
+                        {mindmapContentAnalytics.data.tagDistribution.slice(0, 10).map((tag: any) => (
+                          <Badge key={tag.tag} variant="outline">
+                            {tag.tag} ({tag.count})
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {mindmapContentAnalytics.data.distributionBySourceType.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-2">By Source Type</div>
+                      <div className="space-y-1">
+                        {mindmapContentAnalytics.data.distributionBySourceType.map((item: any) => (
+                          <div key={item.sourceType} className="flex justify-between text-sm">
+                            <span className="text-gray-600 capitalize">{item.sourceType}</span>
+                            <span className="font-semibold">{formatNumber(item.count)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Workspace Activity Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Workspace Activity</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Activity metrics across all workspaces.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {workspaceActivityAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : workspaceActivityAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load workspace activity analytics"
+                  description={workspaceActivityAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !workspaceActivityAnalytics.data ? (
+                <EmptyState title="No data" description="No workspace activity analytics available." />
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm text-gray-600">Active Workspaces</div>
+                    <div className="text-2xl font-bold">{formatNumber(workspaceActivityAnalytics.data.activeWorkspaces)}</div>
+                  </div>
+                  {workspaceActivityAnalytics.data.topWorkspacesByActivity.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-2">Top Active Workspaces</div>
+                      <div className="space-y-2">
+                        {workspaceActivityAnalytics.data.topWorkspacesByActivity.slice(0, 5).map((ws: any) => (
+                          <div key={ws.workspaceId} className="flex justify-between items-center text-sm">
+                            <span className="text-gray-600 truncate">{ws.workspaceName}</span>
+                            <Badge variant="outline">{formatNumber(Math.round(ws.activityScore))}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

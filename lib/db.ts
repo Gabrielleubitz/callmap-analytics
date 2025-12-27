@@ -950,6 +950,124 @@ export async function getBehaviorCohorts(range: DateRange, maxWeeks?: number): P
   return extractMetricData(result)
 }
 
+// New Features Analytics
+
+export async function getActionItemsAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/action-items', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalCreated: 0,
+    totalCompleted: 0,
+    completionRate: 0,
+    addedToCalendar: 0,
+    contactResolved: 0,
+    byEventType: {},
+    bySource: {},
+    dailyCreated: [],
+    dailyCompleted: [],
+  }
+}
+
+export async function getCallLogsAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/call-logs', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalWebhooks: 0,
+    recordingsProcessed: 0,
+    transcriptionsStarted: 0,
+    transcriptionsCompleted: 0,
+    mindmapsCreated: 0,
+    byEventType: {},
+    byProvider: {},
+    dailyWebhooks: [],
+    dailyRecordings: [],
+  }
+}
+
+export async function getContactsAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/contacts', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalSearches: 0,
+    totalResolved: 0,
+    totalActions: 0,
+    totalEmailDrafts: 0,
+    byEventType: {},
+    dailySearches: [],
+    dailyResolved: [],
+  }
+}
+
+export async function getMindmapContentAnalytics(range: DateRange): Promise<{
+  averageNodesPerMindmap: number
+  totalNodes: number
+  totalMindmaps: number
+  tagDistribution: Array<{ tag: string; count: number }>
+  mostActiveMindmaps: Array<{
+    mindmapId: string
+    title: string
+    viewCount: number
+    editCount: number
+    exportCount: number
+    createdAt: string
+  }>
+  distributionBySourceType: Array<{ sourceType: string; count: number }>
+  distributionByWorkspace: Array<{ workspaceId: string | null; count: number }>
+} | null> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/mindmap-content', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
+export async function getWorkspaceActivityAnalytics(range: DateRange): Promise<{
+  activeWorkspaces: number
+  workspaces: Array<{
+    workspaceId: string
+    workspaceName: string
+    plan: string
+    memberCount: number
+    mindmapCount: number
+    tokenUsage: number
+    cost: number
+    collaborationCount: number
+    lastActivityAt: string | null
+  }>
+  topWorkspacesByActivity: Array<{
+    workspaceId: string
+    workspaceName: string
+    activityScore: number
+  }>
+} | null> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/workspace-activity', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result)
+}
+
 // Analytics Alerts
 
 export async function getAnalyticsAlerts(): Promise<{
@@ -1140,6 +1258,66 @@ export async function getWalletMetrics(
 
   if (!result) return null
   return extractMetricData(result)
+}
+
+/**
+ * Get user health score
+ */
+export async function getUserHealthScore(userId: string): Promise<{
+  userId: string
+  score: number
+  factors: {
+    activity: number
+    engagement: number
+    featureUsage: number
+    sentiment: number
+    payment: number
+  }
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  lastCalculated: string
+  trends: {
+    scoreChange: number
+    trend: 'improving' | 'stable' | 'declining'
+  }
+  recommendations: string[]
+} | null> {
+  const result = await apiRequest<{ data: any }>(`/api/analytics/user-health/${userId}`, {
+    method: 'GET',
+  })
+  return extractMetricData(result)
+}
+
+/**
+ * Get user health scores
+ */
+export async function getUserHealthScores(filter: 'all' | 'at_risk' = 'at_risk', limit: number = 50): Promise<{
+  items: Array<{
+    userId: string
+    score: number
+    factors: {
+      activity: number
+      engagement: number
+      featureUsage: number
+      sentiment: number
+      payment: number
+    }
+    riskLevel: 'low' | 'medium' | 'high' | 'critical'
+    lastCalculated: string
+    trends: {
+      scoreChange: number
+      trend: 'improving' | 'stable' | 'declining'
+    }
+    recommendations: string[]
+  }>
+  total: number
+}> {
+  const result = await apiRequest<{ items: any[]; total: number }>(`/api/analytics/user-health?filter=${filter}&limit=${limit}`, {
+    method: 'GET',
+  })
+  return {
+    items: result?.items || [],
+    total: result?.total || 0,
+  }
 }
 
 export const TABLE_NAMES = [
