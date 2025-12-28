@@ -3,20 +3,46 @@
 /**
  * Analytics Chat / AI Copilot
  * 
- * Natural language queries for analytics data
+ * Natural language queries for analytics data with full database access
  */
 
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { LoadingState } from "@/components/ui/loading-state"
-import { Bot, Send, User } from "lucide-react"
+import { Bot, Send, User, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle, Lightbulb } from "lucide-react"
 
 interface Message {
   role: 'user' | 'assistant'
-  content: string
+  content?: string
   timestamp: Date
+  agentReports?: AgentReport[]
+}
+
+interface AgentReport {
+  agentId: string
+  agentLabel: string
+  report: {
+    summary?: string
+    keyMetrics?: Array<{ label: string; value: string | number; trend?: string | null }>
+    recommendations?: Array<{
+      title: string
+      severity: 'low' | 'medium' | 'high'
+      description: string
+      impact?: string
+      suggestedActions?: string[]
+    }>
+  } | null
+}
+
+const AGENT_COLORS: Record<string, string> = {
+  marketing: 'bg-purple-100 text-purple-700 border-purple-300',
+  support: 'bg-blue-100 text-blue-700 border-blue-300',
+  product: 'bg-green-100 text-green-700 border-green-300',
+  revenue: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+  ops: 'bg-orange-100 text-orange-700 border-orange-300',
 }
 
 export default function AnalyticsChatPage() {
@@ -39,16 +65,18 @@ export default function AnalyticsChatPage() {
     }
 
     setMessages(prev => [...prev, userMessage])
+    const question = input
     setInput("")
     setIsLoading(true)
 
     try {
+      // Use all agents to get comprehensive answers
       const response = await fetch('/api/admin/ai-agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: input,
-          agents: ['ops'], // Use ops agent for analytics questions
+          message: question,
+          agents: ['marketing', 'support', 'product', 'revenue', 'ops'], // Use all agents for comprehensive answers
         }),
       })
 
@@ -59,28 +87,9 @@ export default function AnalyticsChatPage() {
 
       const data = await response.json()
       
-      // Extract response from agents array
-      let responseText = 'I apologize, but I could not generate a response.'
-      if (data.agents && data.agents.length > 0) {
-        const agentResponse = data.agents[0]
-        if (agentResponse.report) {
-          if (agentResponse.report.summary) {
-            responseText = agentResponse.report.summary
-            if (agentResponse.report.recommendations && agentResponse.report.recommendations.length > 0) {
-              responseText += '\n\nRecommendations:\n'
-              agentResponse.report.recommendations.forEach((rec: any, idx: number) => {
-                responseText += `${idx + 1}. ${rec.title}: ${rec.description}\n`
-              })
-            }
-          } else {
-            responseText = JSON.stringify(agentResponse.report, null, 2)
-          }
-        }
-      }
-
       const assistantMessage: Message = {
         role: 'assistant',
-        content: responseText,
+        agentReports: data.agents || [],
         timestamp: new Date(),
       }
 
@@ -98,12 +107,31 @@ export default function AnalyticsChatPage() {
     }
   }
 
+  const getTrendIcon = (trend?: string | null) => {
+    if (trend === 'up') return <TrendingUp className="h-3 w-3 text-green-600" />
+    if (trend === 'down') return <TrendingDown className="h-3 w-3 text-red-600" />
+    return <Minus className="h-3 w-3 text-gray-400" />
+  }
+
+  const getSeverityBadge = (severity: 'low' | 'medium' | 'high') => {
+    const styles = {
+      high: 'bg-red-100 text-red-700 border-red-300',
+      medium: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+      low: 'bg-blue-100 text-blue-700 border-blue-300',
+    }
+    return (
+      <Badge variant="outline" className={`text-xs ${styles[severity]}`}>
+        {severity}
+      </Badge>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics AI Copilot</h1>
         <p className="text-gray-600 text-sm">
-          Ask questions in natural language about your analytics data
+          Ask any question about your analytics data. I have access to the entire database and can provide insights from Marketing, Support, Product, Revenue, and Operations perspectives.
         </p>
       </div>
 
@@ -129,16 +157,121 @@ export default function AnalyticsChatPage() {
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
+                className={`max-w-[85%] rounded-lg ${
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-blue-600 text-white p-3'
+                    : 'bg-white border border-gray-200 p-0'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs mt-1 opacity-70">
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
+                {message.role === 'user' ? (
+                  <>
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs mt-1 opacity-70">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  </>
+                ) : message.agentReports ? (
+                  <div className="p-4 space-y-4">
+                    {message.agentReports.map((agent, agentIdx) => {
+                      if (!agent.report) return null
+                      return (
+                        <div key={agentIdx} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs font-semibold ${
+                                AGENT_COLORS[agent.agentId] || 'bg-gray-100 text-gray-700 border-gray-300'
+                              }`}
+                            >
+                              {agent.agentLabel}
+                            </Badge>
+                          </div>
+
+                          {agent.report.summary && (
+                            <p className="text-sm text-gray-700 mb-3 leading-relaxed">
+                              {agent.report.summary}
+                            </p>
+                          )}
+
+                          {agent.report.keyMetrics && agent.report.keyMetrics.length > 0 && (
+                            <div className="mb-3">
+                              <h5 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                                Key Metrics
+                              </h5>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {agent.report.keyMetrics.map((metric, metricIdx) => (
+                                  <div
+                                    key={metricIdx}
+                                    className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+                                  >
+                                    <span className="text-gray-600">{metric.label}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-gray-900">
+                                        {typeof metric.value === 'number'
+                                          ? metric.value.toLocaleString()
+                                          : metric.value}
+                                      </span>
+                                      {getTrendIcon(metric.trend)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {agent.report.recommendations && agent.report.recommendations.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Lightbulb className="h-3 w-3 text-yellow-600" />
+                                <h5 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                  Recommendations
+                                </h5>
+                              </div>
+                              <div className="space-y-2">
+                                {agent.report.recommendations.map((rec, recIdx) => (
+                                  <div
+                                    key={recIdx}
+                                    className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                                  >
+                                    <div className="flex items-start justify-between mb-1">
+                                      <h6 className="font-semibold text-sm text-gray-900">
+                                        {rec.title}
+                                      </h6>
+                                      {getSeverityBadge(rec.severity)}
+                                    </div>
+                                    <p className="text-xs text-gray-700 mb-1">{rec.description}</p>
+                                    {rec.impact && (
+                                      <p className="text-xs text-gray-600 italic mb-2">
+                                        Impact: {rec.impact}
+                                      </p>
+                                    )}
+                                    {rec.suggestedActions && rec.suggestedActions.length > 0 && (
+                                      <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 mt-2">
+                                        {rec.suggestedActions.map((action, actionIdx) => (
+                                          <li key={actionIdx}>{action}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm whitespace-pre-wrap p-3">{message.content}</p>
+                    <p className="text-xs px-3 pb-3 text-gray-400">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  </>
+                )}
               </div>
               {message.role === 'user' && (
                 <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
