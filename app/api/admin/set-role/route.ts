@@ -13,26 +13,23 @@ import { errorResponse } from '@/lib/utils/api-response'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify session and check for superAdmin role
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireSuperAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireSuperAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+    if (!authResult.success || !authResult.decodedToken) {
+      // SECURITY: Log permission denial
+      const { logPermissionDenied } = await import('@/lib/auth/security-log')
+      await logPermissionDenied(
+        authResult.decodedToken?.uid || null,
+        'set_role',
+        'admin',
+        request
       )
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    // Check if user is superAdmin
-    if (decodedToken.role !== 'superAdmin') {
-      return NextResponse.json(
-        { error: 'Forbidden. SuperAdmin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     const body = await request.json()
     const { uid, role } = body
@@ -57,6 +54,12 @@ export async function POST(request: NextRequest) {
     await auth.setCustomUserClaims(uid, {
       isAdmin: true,
       role: role,
+    })
+
+    // SECURITY: Log role change to security events
+    const { logRoleChange } = await import('@/lib/auth/security-log')
+    await logRoleChange(uid, role, decodedToken.uid, request).catch((error) => {
+      console.error('[Admin Set Role] Error logging security event:', error)
     })
 
     // SECURITY: Log audit trail for role changes

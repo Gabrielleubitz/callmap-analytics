@@ -10,26 +10,23 @@ import { cookies } from 'next/headers'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify session and check for superAdmin role
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireSuperAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireSuperAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+    if (!authResult.success || !authResult.decodedToken) {
+      // SECURITY: Log permission denial
+      const { logPermissionDenied } = await import('@/lib/auth/security-log')
+      await logPermissionDenied(
+        authResult.decodedToken?.uid || null,
+        'list_users',
+        'admin',
+        request
       )
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    // Check if user is superAdmin
-    if (decodedToken.role !== 'superAdmin') {
-      return NextResponse.json(
-        { error: 'Forbidden. SuperAdmin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     const auth = getAuth()
     

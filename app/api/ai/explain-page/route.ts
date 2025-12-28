@@ -21,19 +21,41 @@ function getOpenAIClient(): OpenAI | null {
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
+    const decodedToken = authResult.decodedToken
 
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
+    // SECURITY: Rate limit explain page requests (20 per minute per user)
+    const { checkRateLimitKV, getClientIdentifier } = await import('@/lib/auth/rate-limit-kv')
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = await checkRateLimitKV(
+      `explain-page:${decodedToken.uid}`,
+      20, // 20 requests
+      60 * 1000, // per minute
+      request
+    )
+
+    if (rateLimitResult.rateLimited) {
       return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
+        {
+          error: 'Too many requests. Please try again later.',
+          retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '20',
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': rateLimitResult.resetTime.toString(),
+          },
+        }
       )
     }
 

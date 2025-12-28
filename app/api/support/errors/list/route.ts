@@ -16,21 +16,23 @@ import * as admin from 'firebase-admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
+    if (!authResult.success || !authResult.decodedToken) {
+      // SECURITY: Log permission denial
+      const { logPermissionDenied } = await import('@/lib/auth/security-log')
+      await logPermissionDenied(
+        authResult.decodedToken?.uid || null,
+        'list_errors',
+        'support',
+        request
       )
+      return authErrorResponse(authResult)
     }
+
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return NextResponse.json(
