@@ -41,8 +41,8 @@ const AGENT_LABELS: Record<string, string> = {
 
 export function AICoach({ pageContext, className = "" }: AICoachProps) {
   const [data, setData] = useState<CoachData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasLoaded, setHasLoaded] = useState(false)
 
@@ -81,13 +81,7 @@ export function AICoach({ pageContext, className = "" }: AICoachProps) {
     }
   }
 
-  // Auto-load explanation on mount
-  useEffect(() => {
-    if (!hasLoaded) {
-      fetchExplanation()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Don't auto-load - user must click to expand
 
   // Build URL for AI agents page with pre-filled data
   const getAgentsUrl = () => {
@@ -101,43 +95,51 @@ export function AICoach({ pageContext, className = "" }: AICoachProps) {
   return (
     <Card className={`border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-sm ${className}`}>
       <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-blue-600" />
+            <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-blue-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 text-base">AI Page Overview</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Automated insights about this page</p>
+              <h3 className="font-semibold text-gray-900 text-sm">AI Page Overview</h3>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasLoaded && (
+            {isExpanded && hasLoaded && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={fetchExplanation}
                 disabled={isLoading}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0"
                 title="Refresh explanation"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
             )}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                setIsExpanded(!isExpanded)
+                if (!isExpanded && !hasLoaded) {
+                  fetchExplanation()
+                }
+              }}
+              className="h-7 w-7 p-0"
             >
               {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="h-3 w-3" />
               ) : (
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3" />
               )}
             </Button>
           </div>
         </div>
+
+        {!isExpanded && (
+          <p className="text-xs text-gray-500">Click to see AI-powered insights about this page</p>
+        )}
 
         {isExpanded && (
           <div className="space-y-4 pt-2 border-t border-blue-200">
