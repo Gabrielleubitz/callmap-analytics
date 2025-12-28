@@ -85,20 +85,21 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // Content Security Policy
-  // Allow same-origin, Firebase, and trusted CDNs
+  // SECURITY: Tightened CSP - Firebase requires unsafe-eval, but we minimize other permissions
   const cspDirectives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.gstatic.com https://www.google.com", // Firebase requires unsafe-eval
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind and Google Fonts
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://api.openai.com wss://*.firebaseio.com", // Added OpenAI API
     "frame-src 'self' https://www.google.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     "upgrade-insecure-requests",
+    "require-trusted-types-for 'script'", // XSS protection
   ]
   
   response.headers.set('Content-Security-Policy', cspDirectives.join('; '))

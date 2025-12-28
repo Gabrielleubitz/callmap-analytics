@@ -20,14 +20,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
+
+    const decodedToken = authResult.decodedToken
 
     const alerts = await getActiveAlerts(100)
 
@@ -105,14 +106,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
+
+    const decodedToken = authResult.decodedToken
 
     const body = await request.json()
     const { alertId, action } = body
