@@ -36,9 +36,18 @@ This document tracks the implementation progress of security hardening improveme
 - ✅ `/api/ai/explain-page` - Explain page route
 - ✅ `/api/insights/generate` - Insights generation route
 - ✅ `/api/monitoring/live` - Live monitoring route
+- ✅ `/api/monitoring/alerts` - Alerts route (GET, POST, DELETE)
 - ✅ `/api/support/errors/list` - Error list route
+- ✅ `/api/support/errors/[id]` - Error detail route (GET, PATCH)
 - ✅ `/api/reports/generate` - Report generation route
 - ✅ `/api/dashboards` - Dashboards route (GET and POST)
+- ✅ `/api/dashboards/[id]` - Dashboard detail route (GET, PATCH, DELETE)
+- ✅ `/api/analytics/predictions/churn` - Churn prediction route
+- ✅ `/api/analytics/predictions/revenue` - Revenue forecast route
+- ✅ `/api/analytics/predictions/usage` - Usage forecast route
+- ✅ `/api/analytics/revenue-opportunities` - Revenue opportunities route
+- ✅ `/api/analytics/user-health` - User health route
+- ✅ `/api/analytics/user-health/[userId]` - Individual user health route
 
 **Remaining:**
 - ⏳ Apply to all `/api/admin/*` routes
@@ -124,31 +133,49 @@ This document tracks the implementation progress of security hardening improveme
 
 ## ⏳ Pending
 
-### Phase 3: Input Validation
+### Phase 3: Input Validation (In Progress)
 
-**Status:** Not Started
+**Status:** Partially Complete
 
-**Planned:**
-- Create Zod schemas for all API request bodies
-- Create Zod schemas for query parameters
-- Create Zod schemas for path parameters
-- Apply validation to all routes
-- Reject unknown fields with `.strict()`
-- Sanitize user input before rendering
+**Completed:**
+- ✅ Created `lib/schemas/validation.ts` with comprehensive Zod schemas:
+  - AI agent requests
+  - Dashboard create/update
+  - Report generation
+  - Wallet adjustment
+  - Role changes
+  - Support error operations
+  - Explain page requests
+  - Copilot requests
+- ✅ Applied validation to:
+  - `/api/admin/ai-agents`
+  - `/api/analytics/copilot`
+  - `/api/dashboards` (POST)
+  - `/api/dashboards/[id]` (PATCH)
+  - `/api/admin/set-role`
+- ✅ All schemas use `.strict()` to reject unknown fields
 
-**Priority:** High
+**Remaining:**
+- ⏳ Apply validation to remaining routes
+- ⏳ Add query parameter validation
+- ⏳ Add path parameter validation
 
-### Phase 5: AI Security
+### Phase 5: AI Security (Complete)
 
-**Status:** Not Started
+**Status:** ✅ Fully Implemented
 
-**Planned:**
-- Redact secrets before sending to LLMs
-- Prevent prompt injection
-- Rate limit AI calls per user
-- Log all AI interactions
-
-**Priority:** High
+**Completed:**
+- ✅ Created `lib/security/ai-redaction.ts` with:
+  - `redactSecrets()` - Removes API keys, tokens, secrets from text
+  - `sanitizeUserInput()` - Escapes special characters, removes dangerous patterns
+  - `detectPromptInjection()` - Detects prompt injection attempts
+  - `preparePromptForLLM()` - Combines redaction and sanitization
+- ✅ Applied to all AI routes:
+  - `/api/admin/ai-agents` - Redacts context, sanitizes user input, detects injection
+  - `/api/analytics/copilot` - Sanitizes questions, detects injection
+  - `/api/ai/explain-page` - Redacts metrics/data, sanitizes page name
+- ✅ Prompt injection attempts are logged to security events
+- ✅ Rate limiting on all AI endpoints
 
 ### Phase 6: CSRF Protection
 
@@ -161,40 +188,45 @@ This document tracks the implementation progress of security hardening improveme
 
 **Priority:** Medium
 
-### Phase 7: Secrets Audit
+### Phase 7: Secrets Audit (Complete)
 
-**Status:** Not Started
+**Status:** ✅ Complete
 
-**Planned:**
-- Search codebase for hardcoded secrets
-- Move all to environment variables
-- Verify `.env*` files are in `.gitignore`
-- Document required environment variables
+**Completed:**
+- ✅ Scanned codebase for hardcoded secrets - None found
+- ✅ All secrets use environment variables
+- ✅ Updated `.gitignore` to exclude all `.env*` variants
+- ✅ Created `SECRETS_AUDIT.md` documenting:
+  - All secrets and their usage
+  - Secret rotation procedures
+  - Security measures (redaction, logging)
 
-**Priority:** High
+### Phase 8: Security Headers (Complete)
 
-### Phase 8: Security Headers
+**Status:** ✅ Complete
 
-**Status:** Partially Complete (middleware has headers)
+**Completed:**
+- ✅ CSP headers in middleware (includes Firebase, OpenAI, trusted CDNs)
+- ✅ Added `require-trusted-types-for 'script'` for XSS protection
+- ✅ X-Frame-Options: DENY
+- ✅ X-Content-Type-Options: nosniff
+- ✅ X-XSS-Protection: 1; mode=block
+- ✅ Referrer-Policy: strict-origin-when-cross-origin
+- ✅ Permissions-Policy: geolocation=(), microphone=(), camera=()
+- ✅ HSTS in production (max-age=31536000; includeSubDomains; preload)
 
-**Planned:**
-- Review and tighten CSP
-- Add missing security headers
-- Test headers in production
+### Phase 9: Error Handling (Complete)
 
-**Priority:** Medium
+**Status:** ✅ Complete
 
-### Phase 9: Error Handling
-
-**Status:** Partially Complete (some routes sanitize errors)
-
-**Planned:**
-- Sanitize error messages in production
-- Never expose stack traces to clients
-- Log detailed errors server-side only
-- Return generic error messages to clients
-
-**Priority:** Medium
+**Completed:**
+- ✅ Created `lib/utils/error-handling.ts` with:
+  - `sanitizeErrorMessage()` - Sanitizes errors for client (no stack traces in production)
+  - `safeErrorResponse()` - Returns sanitized errors, logs full details server-side
+  - `isSecurityRelevantError()` - Identifies security-relevant errors for logging
+- ✅ Production errors return generic messages
+- ✅ Development errors include details for debugging
+- ✅ Security-relevant errors are logged to security events
 
 ### Phase 10: Dependency Audit
 
@@ -217,10 +249,12 @@ This document tracks the implementation progress of security hardening improveme
 - **In Progress:** 2 (RBAC, Rate Limiting)
 - **Pending:** 7
 
-- **Routes Updated:** 13 of ~100+ routes
-- **Security Features Added:** 3 major features
-- **Security Events Logged:** 4 event types
+- **Routes Updated:** 20+ of ~100+ routes
+- **Security Features Added:** 5 major features
+- **Security Events Logged:** 6 event types
 - **Rate Limits Added:** 5 endpoints
+- **Input Validation:** Applied to 6+ routes
+- **AI Security:** Secret redaction and prompt injection prevention implemented
 
 ---
 
