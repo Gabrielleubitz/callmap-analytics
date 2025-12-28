@@ -19,7 +19,6 @@ import { ErrorState } from "@/components/ui/error-state"
 import { formatNumber, formatDateTime } from "@/lib/utils"
 import { Activity, Users, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react"
 import { AICoach } from "@/components/ai/ai-coach"
-import { AICoach } from "@/components/ai/ai-coach"
 import {
   LineChart,
   Line,
