@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifySessionCookie } from '@/lib/auth/session'
+import { getBaseSystemPrompt, type AgentType, type Tone } from '@/lib/ai-agents/system-knowledge'
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -244,6 +245,8 @@ Ignore marketing and pricing strategy.
 interface AgentRunRequest {
   message: string
   agents?: AgentId[]
+  agentType?: 'product' | 'dev' // New: specific agent type for Product/Dev agents
+  tone?: Tone // New: 'normal' or 'brutal'
   // Optional lightweight history to give agents continuity between runs
   history?: {
     rounds: Array<{
@@ -306,6 +309,80 @@ async function buildContext(request: NextRequest) {
   }
 }
 
+/**
+ * Detect if a question is asking for data/statistics
+ */
+function isDataQuestion(message: string): boolean {
+  const dataKeywords = [
+    'how many',
+    'how much',
+    'count',
+    'number of',
+    'which',
+    'top',
+    'most',
+    'least',
+    'statistics',
+    'metrics',
+    'usage',
+    'active',
+    'created',
+    'last month',
+    'this week',
+    'this month',
+  ]
+  const lowerMessage = message.toLowerCase()
+  return dataKeywords.some(keyword => lowerMessage.includes(keyword))
+}
+
+/**
+ * Detect if answer contains buildable recommendations
+ */
+function shouldShowGeneratePrompt(answer: string): boolean {
+  const buildKeywords = [
+    'add',
+    'implement',
+    'create',
+    'build',
+    'change',
+    'improve',
+    'refactor',
+    'update',
+    'modify',
+    'fix',
+    'enhance',
+  ]
+  const lowerAnswer = answer.toLowerCase()
+  return buildKeywords.some(keyword => lowerAnswer.includes(keyword))
+}
+
+/**
+ * Suggest tags for a conversation
+ */
+function suggestTags(message: string, answer: string): string[] {
+  const tags: string[] = []
+  const lowerMessage = message.toLowerCase()
+  const lowerAnswer = answer.toLowerCase()
+
+  if (isDataQuestion(message)) {
+    tags.push('data')
+  }
+
+  if (lowerMessage.includes('think') || lowerMessage.includes('opinion') || lowerMessage.includes('feedback')) {
+    tags.push('critique')
+  }
+
+  if (lowerMessage.includes('idea') || lowerMessage.includes('suggest') || lowerMessage.includes('should we')) {
+    tags.push('idea')
+  }
+
+  if (shouldShowGeneratePrompt(answer)) {
+    tags.push('build')
+  }
+
+  return tags.length > 0 ? tags : ['general']
+}
+
 async function runAgent(
   agentId: AgentId,
   input: AgentRunRequest,
@@ -316,27 +393,28 @@ async function runAgent(
     throw new Error('OPENAI_API_KEY is not configured')
   }
 
-  const agent = AGENTS[agentId]
+  // Handle Product and Dev agents with tone control
+  let systemPrompt = ''
+  let agentLabel = ''
+  let agentDescription = ''
 
-  // Build a short, agent-specific conversation history
-  const historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  if (input.history?.rounds) {
-    for (const round of input.history.rounds.slice(-5)) {
-      const response = round.responses.find((r) => r.agentId === agentId)
-      if (response) {
-        historyMessages.push({
-          role: 'user',
-          content: round.question,
-        })
-        historyMessages.push({
-          role: 'assistant',
-          content: response.summary,
-        })
-      }
+  if (input.agentType === 'product' || input.agentType === 'dev') {
+    // Use new Product/Dev agents with system knowledge
+    const tone = input.tone || 'normal'
+    systemPrompt = getBaseSystemPrompt(input.agentType, tone)
+    agentLabel = input.agentType === 'product' ? 'Product' : 'Dev'
+    agentDescription = input.agentType === 'product' 
+      ? 'Product and UX expert'
+      : 'Senior Engineer'
+  } else {
+    // Use existing agents (marketing, support, revenue, ops)
+    if (!(agentId in AGENTS)) {
+      throw new Error(`Unknown agent: ${agentId}`)
     }
-  }
-
-  const systemPrompt = `
+    const agent = AGENTS[agentId as keyof typeof AGENTS]
+    agentLabel = agent.label
+    agentDescription = agent.description
+    systemPrompt = `
 You are the ${agent.label} AI agent for CallMap's internal analytics admin dashboard.
 
 ${agent.expertise}
@@ -371,6 +449,25 @@ Your entire response MUST be valid JSON of the form:
   ]
 }
 `.trim()
+  }
+
+  // Build a short, agent-specific conversation history
+  const historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  if (input.history?.rounds) {
+    for (const round of input.history.rounds.slice(-5)) {
+      const response = round.responses.find((r) => r.agentId === agentId)
+      if (response) {
+        historyMessages.push({
+          role: 'user',
+          content: round.question,
+        })
+        historyMessages.push({
+          role: 'assistant',
+          content: response.summary,
+        })
+      }
+    }
+  }
 
   const messages: Array<{ role: string; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -436,8 +533,8 @@ Your entire response MUST be valid JSON of the form:
   }
 
   return {
-    agentId,
-    agentLabel: agent.label,
+    agentId: input.agentType || agentId,
+    agentLabel: input.agentType ? agentLabel : (AGENTS[agentId as keyof typeof AGENTS]?.label || agentLabel),
     raw: json,
     report: parsed,
   }
@@ -468,6 +565,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
     }
 
+    // Handle Product/Dev agents (single agent mode)
+    if (body.agentType === 'product' || body.agentType === 'dev') {
+      const context = await buildContext(request)
+      // Pass a placeholder agentId for runAgent, but it will use agentType instead
+      const result = await runAgent('product' as AgentId, body, context)
+      
+      // Analyze response for metadata
+      const answerText = result.report?.summary || JSON.stringify(result.report || {})
+      const isData = isDataQuestion(message)
+      const showGeneratePrompt = shouldShowGeneratePrompt(answerText)
+      const tags = suggestTags(message, answerText)
+
+      return NextResponse.json({
+        generatedAt: new Date().toISOString(),
+        contextRange: context.range,
+        agent: result,
+        metadata: {
+          agentType: body.agentType,
+          tone: body.tone || 'normal',
+          isDataQuestion: isData,
+          showGeneratePrompt,
+          showExport: isData,
+          suggestedTags: tags,
+        },
+      })
+    }
+
+    // Handle existing multi-agent mode
     const requestedAgents = (body.agents && body.agents.length
       ? body.agents
       : (Object.keys(AGENTS) as AgentId[])
