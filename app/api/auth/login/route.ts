@@ -88,6 +88,13 @@ export async function POST(request: NextRequest) {
         ? 'Invalid credentials' 
         : error.message
       console.error('[Login] Token verification failed:', error.message)
+      
+      // SECURITY: Log failed login attempt
+      const body = await request.json().catch(() => ({}))
+      const email = (body as any)?.email || 'unknown'
+      const { logFailedLogin } = await import('@/lib/auth/security-log')
+      await logFailedLogin(email, error.message, request)
+      
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -114,6 +121,10 @@ export async function POST(request: NextRequest) {
     // Create session cookie using adminAuth
     const expiresIn = 1000 * 60 * 60 * 8 // 8 hours
     const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn })
+
+    // SECURITY: Log successful login
+    const { logSuccessfulLogin } = await import('@/lib/auth/security-log')
+    await logSuccessfulLogin(decodedToken.uid, decodedToken.email || null, request)
 
     // Set cookie in response
     const response = NextResponse.json({ 
