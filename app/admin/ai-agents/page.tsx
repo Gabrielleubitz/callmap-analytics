@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -68,6 +69,15 @@ interface Round {
 }
 
 export default function AIAgentsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AIAgentsContent />
+    </Suspense>
+  )
+}
+
+function AIAgentsContent() {
+  const searchParams = useSearchParams()
   const [input, setInput] = useState(
     "Give me a cross-functional brief on risks and opportunities for the next 30 days."
   )
@@ -77,6 +87,30 @@ export default function AIAgentsPage() {
   const [rounds, setRounds] = useState<Round[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasInitialized, setHasInitialized] = useState(false)
+
+  // Read URL parameters and pre-fill form
+  useEffect(() => {
+    if (!hasInitialized && searchParams) {
+      const queryParam = searchParams.get('q')
+      const agentsParam = searchParams.get('agents')
+      
+      if (queryParam) {
+        setInput(decodeURIComponent(queryParam))
+      }
+      
+      if (agentsParam) {
+        const agentIds = agentsParam.split(',').filter((id): id is AgentId => 
+          AGENTS.some(a => a.id === id)
+        ) as AgentId[]
+        if (agentIds.length > 0) {
+          setSelectedAgents(agentIds)
+        }
+      }
+      
+      setHasInitialized(true)
+    }
+  }, [searchParams, hasInitialized])
 
   const toggleAgent = (id: AgentId) => {
     setSelectedAgents((prev) =>

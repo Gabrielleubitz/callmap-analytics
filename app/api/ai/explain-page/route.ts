@@ -69,12 +69,19 @@ export async function POST(request: NextRequest) {
 
 ${contextText}
 
-Provide a clear, concise explanation (2-4 sentences) of:
-1. What this page shows
-2. What the key metrics/data mean
-3. What actions or insights they should focus on
+Provide a structured response with:
+1. "overview": A simple 2-3 sentence explanation of what this page shows and what the user is looking at
+2. "keyTakeaways": An array of 3-5 key insights or important points from the data (each as a string)
+3. "suggestedAgents": An array of 1-3 agent IDs that would be most relevant for this page. Choose from: "marketing", "support", "product", "revenue", "ops"
+4. "suggestedPrompt": A suggested question/prompt the user could ask the AI agents about this page
 
-Be conversational and helpful. Return as JSON: {"explanation": "your explanation text"}`
+Return as JSON with this exact structure:
+{
+  "overview": "simple explanation text",
+  "keyTakeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
+  "suggestedAgents": ["agent1", "agent2"],
+  "suggestedPrompt": "suggested question text"
+}`
 
     try {
       const completion = await openai.chat.completions.create({
@@ -89,7 +96,10 @@ Be conversational and helpful. Return as JSON: {"explanation": "your explanation
         try {
           const parsed = JSON.parse(response)
           return NextResponse.json({
-            explanation: parsed.explanation || 'Unable to generate explanation.',
+            overview: parsed.overview || `This is the ${pageName} page. ${description || 'It displays analytics and metrics related to your CallMap data.'}`,
+            keyTakeaways: parsed.keyTakeaways || [],
+            suggestedAgents: parsed.suggestedAgents || ['ops'],
+            suggestedPrompt: parsed.suggestedPrompt || `Tell me more about the ${pageName} data and what I should focus on.`,
           })
         } catch (parseError) {
           console.error('[AI Explain] Failed to parse response:', parseError)
@@ -99,9 +109,12 @@ Be conversational and helpful. Return as JSON: {"explanation": "your explanation
       console.error('[AI Explain] AI generation failed:', aiError)
     }
 
-    // Fallback explanation
+    // Fallback response
     return NextResponse.json({
-      explanation: `This is the ${pageName} page. ${description || 'It displays analytics and metrics related to your CallMap data.'}`,
+      overview: `This is the ${pageName} page. ${description || 'It displays analytics and metrics related to your CallMap data.'}`,
+      keyTakeaways: [],
+      suggestedAgents: ['ops'],
+      suggestedPrompt: `Tell me more about the ${pageName} data and what I should focus on.`,
     })
   } catch (error: any) {
     console.error('[AI Explain] Error:', error)
