@@ -414,9 +414,9 @@ export default function AIAgentsPage() {
                 Examples:
               </p>
               <ul className="text-sm mt-2 space-y-1 text-left max-w-md mx-auto">
-                <li>• "What do you think about the colors on the analytics page?"</li>
-                <li>• "How can we improve the teams page UX?"</li>
-                <li>• "Where are security gaps in our API routes?"</li>
+                <li>• &quot;What do you think about the colors on the analytics page?&quot;</li>
+                <li>• &quot;How can we improve the teams page UX?&quot;</li>
+                <li>• &quot;Where are security gaps in our API routes?&quot;</li>
               </ul>
             </div>
           )}
