@@ -15,7 +15,6 @@ import { formatNumber } from "@/lib/utils"
 import Link from "next/link"
 import { TrendingUp, DollarSign, Target, ArrowUpRight } from "lucide-react"
 import { AICoach } from "@/components/ai/ai-coach"
-import { AICoach } from "@/components/ai/ai-coach"
 
 interface RevenueOpportunity {
   userId: string

@@ -109,6 +109,19 @@ export default function UsageForecastPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "Usage Forecasting",
+            description: `Predicts ${selectedMetric} usage, mindmap creation, and user growth`,
+            metrics: forecasts.length > 0 ? {
+              forecast30d: forecasts.find(f => f.period === '30d')?.forecastedValue,
+              forecast60d: forecasts.find(f => f.period === '60d')?.forecastedValue,
+              forecast90d: forecasts.find(f => f.period === '90d')?.forecastedValue,
+            } : undefined,
+          }}
+        />
+      </div>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Usage Forecasting</h1>
