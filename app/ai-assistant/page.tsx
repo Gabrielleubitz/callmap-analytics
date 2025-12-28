@@ -6,7 +6,7 @@
  * Combines AI Agents and AI Copilot into a single unified interface
  */
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -57,7 +57,7 @@ interface Message {
   }
 }
 
-export default function AIAssistantPage() {
+function AIAssistantContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<"agents" | "copilot">("agents")
   
@@ -489,6 +489,14 @@ export default function AIAssistantPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+export default function AIAssistantPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AIAssistantContent />
+    </Suspense>
   )
 }
 
