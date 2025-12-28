@@ -623,9 +623,9 @@ export async function POST(request: NextRequest) {
       // Pass a placeholder agentId for runAgent, but it will use agentType instead
       const agentRequest: AgentRunRequest = {
         message: validatedBody.message,
-        agentType: validatedBody.agentType,
-        tone: validatedBody.tone,
-        history: validatedBody.history,
+        agentType: validatedBody.agentType as 'product' | 'dev',
+        tone: validatedBody.tone as 'normal' | 'brutal',
+        history: validatedBody.history as AgentRunRequest['history'],
       }
       const result = await runAgent('product' as AgentId, agentRequest, context)
       
@@ -664,8 +664,8 @@ export async function POST(request: NextRequest) {
 
     const agentRequest: AgentRunRequest = {
       message: validatedBody.message,
-      agents: validatedBody.agents,
-      history: validatedBody.history,
+      agents: validatedBody.agents as AgentId[] | undefined,
+      history: validatedBody.history as AgentRunRequest['history'],
     }
 
     const results = await Promise.all(
