@@ -15,7 +15,6 @@ import { formatDateTime } from "@/lib/utils"
 import Link from "next/link"
 import { AlertTriangle, TrendingDown, Calendar, Lightbulb } from "lucide-react"
 import { AICoach } from "@/components/ai/ai-coach"
-import { AICoach } from "@/components/ai/ai-coach"
 import {
   BarChart,
   Bar,
