@@ -18,23 +18,20 @@ interface Message {
   role: 'user' | 'assistant'
   content?: string
   timestamp: Date
-  agentReports?: AgentReport[]
+  copilotResponse?: CopilotResponse
 }
 
-interface AgentReport {
-  agentId: string
-  agentLabel: string
-  report: {
-    summary?: string
-    keyMetrics?: Array<{ label: string; value: string | number; trend?: string | null }>
-    recommendations?: Array<{
-      title: string
-      severity: 'low' | 'medium' | 'high'
-      description: string
-      impact?: string
-      suggestedActions?: string[]
-    }>
-  } | null
+interface CopilotResponse {
+  answer: string
+  keyMetrics: Array<{ label: string; value: string | number; trend?: string | null }>
+  recommendations: Array<{
+    title: string
+    severity: 'low' | 'medium' | 'high'
+    description: string
+    impact?: string
+    suggestedActions?: string[]
+  }>
+  contributingAgents: Array<{ id: string; label: string }>
 }
 
 const AGENT_COLORS: Record<string, string> = {
@@ -70,13 +67,12 @@ export default function AnalyticsChatPage() {
     setIsLoading(true)
 
     try {
-      // Use all agents to get comprehensive answers
-      const response = await fetch('/api/admin/ai-agents', {
+      // Use the intelligent copilot endpoint
+      const response = await fetch('/api/analytics/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: question,
-          agents: ['marketing', 'support', 'product', 'revenue', 'ops'], // Use all agents for comprehensive answers
         }),
       })
 
@@ -89,7 +85,7 @@ export default function AnalyticsChatPage() {
       
       const assistantMessage: Message = {
         role: 'assistant',
-        agentReports: data.agents || [],
+        copilotResponse: data,
         timestamp: new Date(),
       }
 
@@ -170,96 +166,100 @@ export default function AnalyticsChatPage() {
                       {message.timestamp.toLocaleTimeString()}
                     </p>
                   </>
-                ) : message.agentReports ? (
+                ) : message.copilotResponse ? (
                   <div className="p-4 space-y-4">
-                    {message.agentReports.map((agent, agentIdx) => {
-                      if (!agent.report) return null
-                      return (
-                        <div key={agentIdx} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs font-semibold ${
-                                AGENT_COLORS[agent.agentId] || 'bg-gray-100 text-gray-700 border-gray-300'
-                              }`}
+                    {/* Contributing Agents */}
+                    <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+                      <span className="text-xs text-gray-500">Answered by:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {message.copilotResponse.contributingAgents.map((agent) => (
+                          <Badge
+                            key={agent.id}
+                            variant="outline"
+                            className={`text-xs font-semibold ${
+                              AGENT_COLORS[agent.id] || 'bg-gray-100 text-gray-700 border-gray-300'
+                            }`}
+                          >
+                            {agent.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Main Answer */}
+                    <div>
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {message.copilotResponse.answer}
+                      </p>
+                    </div>
+
+                    {/* Key Metrics */}
+                    {message.copilotResponse.keyMetrics && message.copilotResponse.keyMetrics.length > 0 && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                          Key Metrics
+                        </h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {message.copilotResponse.keyMetrics.map((metric, metricIdx) => (
+                            <div
+                              key={metricIdx}
+                              className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
                             >
-                              {agent.agentLabel}
-                            </Badge>
-                          </div>
-
-                          {agent.report.summary && (
-                            <p className="text-sm text-gray-700 mb-3 leading-relaxed">
-                              {agent.report.summary}
-                            </p>
-                          )}
-
-                          {agent.report.keyMetrics && agent.report.keyMetrics.length > 0 && (
-                            <div className="mb-3">
-                              <h5 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
-                                Key Metrics
-                              </h5>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {agent.report.keyMetrics.map((metric, metricIdx) => (
-                                  <div
-                                    key={metricIdx}
-                                    className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
-                                  >
-                                    <span className="text-gray-600">{metric.label}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-gray-900">
-                                        {typeof metric.value === 'number'
-                                          ? metric.value.toLocaleString()
-                                          : metric.value}
-                                      </span>
-                                      {getTrendIcon(metric.trend)}
-                                    </div>
-                                  </div>
-                                ))}
+                              <span className="text-gray-600">{metric.label}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-900">
+                                  {typeof metric.value === 'number'
+                                    ? metric.value.toLocaleString()
+                                    : metric.value}
+                                </span>
+                                {getTrendIcon(metric.trend)}
                               </div>
                             </div>
-                          )}
-
-                          {agent.report.recommendations && agent.report.recommendations.length > 0 && (
-                            <div>
-                              <div className="flex items-center gap-2 mb-2">
-                                <Lightbulb className="h-3 w-3 text-yellow-600" />
-                                <h5 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                                  Recommendations
-                                </h5>
-                              </div>
-                              <div className="space-y-2">
-                                {agent.report.recommendations.map((rec, recIdx) => (
-                                  <div
-                                    key={recIdx}
-                                    className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
-                                  >
-                                    <div className="flex items-start justify-between mb-1">
-                                      <h6 className="font-semibold text-sm text-gray-900">
-                                        {rec.title}
-                                      </h6>
-                                      {getSeverityBadge(rec.severity)}
-                                    </div>
-                                    <p className="text-xs text-gray-700 mb-1">{rec.description}</p>
-                                    {rec.impact && (
-                                      <p className="text-xs text-gray-600 italic mb-2">
-                                        Impact: {rec.impact}
-                                      </p>
-                                    )}
-                                    {rec.suggestedActions && rec.suggestedActions.length > 0 && (
-                                      <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 mt-2">
-                                        {rec.suggestedActions.map((action, actionIdx) => (
-                                          <li key={actionIdx}>{action}</li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          ))}
                         </div>
-                      )
-                    })}
+                      </div>
+                    )}
+
+                    {/* Recommendations */}
+                    {message.copilotResponse.recommendations && message.copilotResponse.recommendations.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb className="h-3 w-3 text-yellow-600" />
+                          <h5 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            Recommendations
+                          </h5>
+                        </div>
+                        <div className="space-y-2">
+                          {message.copilotResponse.recommendations.map((rec, recIdx) => (
+                            <div
+                              key={recIdx}
+                              className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                            >
+                              <div className="flex items-start justify-between mb-1">
+                                <h6 className="font-semibold text-sm text-gray-900">
+                                  {rec.title}
+                                </h6>
+                                {getSeverityBadge(rec.severity)}
+                              </div>
+                              <p className="text-xs text-gray-700 mb-1">{rec.description}</p>
+                              {rec.impact && (
+                                <p className="text-xs text-gray-600 italic mb-2">
+                                  Impact: {rec.impact}
+                                </p>
+                              )}
+                              {rec.suggestedActions && rec.suggestedActions.length > 0 && (
+                                <ul className="list-disc list-inside text-xs text-gray-600 space-y-1 mt-2">
+                                  {rec.suggestedActions.map((action, actionIdx) => (
+                                    <li key={actionIdx}>{action}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
