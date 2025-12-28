@@ -18,6 +18,8 @@ import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { formatNumber, formatDateTime } from "@/lib/utils"
 import { Activity, Users, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
+import { AICoach } from "@/components/ai/ai-coach"
 import {
   LineChart,
   Line,
@@ -135,6 +137,21 @@ export default function LiveMonitoringPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "Live Monitoring",
+            description: "Real-time system metrics and activity feed",
+            metrics: metrics ? {
+              activeUsers: metrics.activeUsers,
+              activeSessions: metrics.activeSessions,
+              tokenBurnRate: metrics.tokenBurnRate,
+              errorRate: metrics.errorRate,
+              systemHealth: metrics.systemHealth.status,
+            } : undefined,
+          }}
+        />
+      </div>
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>

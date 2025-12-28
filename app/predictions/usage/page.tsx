@@ -13,6 +13,7 @@ import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { formatNumber } from "@/lib/utils"
 import { TrendingUp, TrendingDown, Minus, Zap, FileText, Users } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
 import {
   LineChart,
   Line,

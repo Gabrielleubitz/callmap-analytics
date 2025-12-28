@@ -47,15 +47,40 @@ export default function AnalyticsChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent: 'ops',
-          query: input,
+          message: input,
+          agents: ['ops'], // Use ops agent for analytics questions
         }),
       })
 
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to get AI response')
+      }
+
       const data = await response.json()
+      
+      // Extract response from agents array
+      let responseText = 'I apologize, but I could not generate a response.'
+      if (data.agents && data.agents.length > 0) {
+        const agentResponse = data.agents[0]
+        if (agentResponse.report) {
+          if (agentResponse.report.summary) {
+            responseText = agentResponse.report.summary
+            if (agentResponse.report.recommendations && agentResponse.report.recommendations.length > 0) {
+              responseText += '\n\nRecommendations:\n'
+              agentResponse.report.recommendations.forEach((rec: any, idx: number) => {
+                responseText += `${idx + 1}. ${rec.title}: ${rec.description}\n`
+              })
+            }
+          } else {
+            responseText = JSON.stringify(agentResponse.report, null, 2)
+          }
+        }
+      }
+
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.response || 'I apologize, but I could not generate a response.',
+        content: responseText,
         timestamp: new Date(),
       }
 

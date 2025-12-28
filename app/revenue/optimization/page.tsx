@@ -14,6 +14,8 @@ import { ErrorState } from "@/components/ui/error-state"
 import { formatNumber } from "@/lib/utils"
 import Link from "next/link"
 import { TrendingUp, DollarSign, Target, ArrowUpRight } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
+import { AICoach } from "@/components/ai/ai-coach"
 
 interface RevenueOpportunity {
   userId: string
@@ -97,6 +99,19 @@ export default function RevenueOptimizationPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "Revenue Optimization",
+            description: "Identify upsell opportunities, win-back campaigns, and expansion revenue",
+            metrics: opportunities.length > 0 ? {
+              totalOpportunities: opportunities.length,
+              totalValue: opportunities.reduce((sum, o) => sum + o.opportunityValue, 0),
+              upsellCount: opportunities.filter(o => o.type === 'upsell').length,
+            } : undefined,
+          }}
+        />
+      </div>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Revenue Optimization</h1>

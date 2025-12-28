@@ -15,6 +15,8 @@ import { ErrorState } from "@/components/ui/error-state"
 import { formatDateTime } from "@/lib/utils"
 import Link from "next/link"
 import { Heart, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
+import { AICoach } from "@/components/ai/ai-coach"
 import {
   BarChart,
   Bar,
@@ -135,6 +137,19 @@ export default function UserHealthPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "User Health Dashboard",
+            description: "Monitor user health scores and identify at-risk users",
+            metrics: healthScores.length > 0 ? {
+              totalUsers: healthScores.length,
+              averageScore: Math.round(healthScores.reduce((sum, s) => sum + s.score, 0) / healthScores.length),
+              atRiskUsers: healthScores.filter(s => s.riskLevel === 'high' || s.riskLevel === 'critical').length,
+            } : undefined,
+          }}
+        />
+      </div>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">User Health Dashboard</h1>

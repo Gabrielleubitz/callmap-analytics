@@ -41,6 +41,7 @@ import {
 import Link from "next/link"
 import { formatDateTime } from "@/lib/utils"
 import { Users, Activity, Zap, TrendingUp, AlertCircle, CheckCircle } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
 
 export default function OverviewPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -391,6 +392,22 @@ export default function OverviewPage() {
 
   return (
     <div className="container mx-auto px-4 py-6">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "Overview Dashboard",
+            description: "High-level KPIs, metrics, and analytics for CallMap",
+            metrics: metrics.data ? {
+              active_users: metrics.data.active_users,
+              total_users: metrics.data.total_users,
+              sessions: metrics.data.sessions,
+              tokens_used: metrics.data.tokens_used,
+              mrr_estimate: metrics.data.mrr_estimate,
+              estimated_cost: metrics.data.estimated_cost,
+            } : undefined,
+          }}
+        />
+      </div>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">

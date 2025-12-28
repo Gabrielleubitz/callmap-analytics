@@ -14,6 +14,7 @@ import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { formatDateTime } from "@/lib/utils"
 import { Lightbulb, AlertTriangle, TrendingUp, CheckCircle, RefreshCw } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
 
 interface Insight {
   id: string

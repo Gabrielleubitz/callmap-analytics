@@ -14,6 +14,8 @@ import { ErrorState } from "@/components/ui/error-state"
 import { formatDateTime } from "@/lib/utils"
 import Link from "next/link"
 import { AlertTriangle, TrendingDown, Calendar, Lightbulb } from "lucide-react"
+import { AICoach } from "@/components/ai/ai-coach"
+import { AICoach } from "@/components/ai/ai-coach"
 import {
   BarChart,
   Bar,
@@ -113,6 +115,19 @@ export default function ChurnPredictionPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <AICoach
+          pageContext={{
+            pageName: "Churn Prediction",
+            description: "ML-based churn risk scoring with intervention recommendations",
+            metrics: predictions.length > 0 ? {
+              totalUsers: predictions.length,
+              averageRisk: Math.round(predictions.reduce((sum, p) => sum + p.churnRisk, 0) / predictions.length),
+              highRiskUsers: predictions.filter(p => p.churnRisk >= 60).length,
+            } : undefined,
+          }}
+        />
+      </div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Churn Prediction</h1>
         <p className="text-gray-600 text-sm">
