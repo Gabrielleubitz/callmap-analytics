@@ -19,19 +19,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let decodedToken
-    try {
-      decodedToken = await verifySessionCookie(sessionCookie)
-    } catch {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
+
+    if (!authResult.success || !authResult.decodedToken) {
+      // SECURITY: Log permission denial
+      const { logPermissionDenied } = await import('@/lib/auth/security-log')
+      await logPermissionDenied(
+        authResult.decodedToken?.uid || null,
+        'remove_team_member',
+        `team:${params.id}`,
+        request
+      )
+      return authErrorResponse(authResult)
     }
 
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return NextResponse.json(
