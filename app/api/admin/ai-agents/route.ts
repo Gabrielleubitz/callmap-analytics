@@ -473,16 +473,16 @@ Your entire response MUST be valid JSON of the form:
     { role: 'system', content: systemPrompt },
     {
       role: 'user',
-      content: `Here is the latest data context as JSON:\n\n${JSON.stringify(
+      content: `Here is the latest data context as JSON:\n\n${(await import('@/lib/security/ai-redaction')).redactSecrets(JSON.stringify(
         context,
         null,
         2
-      )}`,
+      ))}`,
     },
     ...historyMessages,
     {
       role: 'user',
-      content: `New admin question or prompt: ${input.message}`,
+      content: `New admin question or prompt: ${(await import('@/lib/security/ai-redaction')).sanitizeUserInput(input.message)}`,
     },
   ]
 
@@ -589,6 +589,23 @@ export async function POST(request: NextRequest) {
     const message = (body.message || '').trim()
     if (!message) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
+    }
+
+    // SECURITY: Check for prompt injection attempts
+    const { detectPromptInjection } = await import('@/lib/security/ai-redaction')
+    if (detectPromptInjection(message)) {
+      // SECURITY: Log suspicious activity
+      const { logSuspiciousActivity } = await import('@/lib/auth/security-log')
+      await logSuspiciousActivity(
+        decodedToken.uid,
+        'prompt_injection_attempt',
+        { message: message.slice(0, 100) },
+        request
+      )
+      return NextResponse.json(
+        { error: 'Invalid input detected. Please rephrase your question.' },
+        { status: 400 }
+      )
     }
 
     // Handle Product/Dev agents (single agent mode)

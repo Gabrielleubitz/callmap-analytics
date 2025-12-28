@@ -103,6 +103,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
     }
 
+    // SECURITY: Check for prompt injection attempts
+    const { detectPromptInjection, sanitizeUserInput } = await import('@/lib/security/ai-redaction')
+    if (detectPromptInjection(question)) {
+      // SECURITY: Log suspicious activity
+      const { logSuspiciousActivity } = await import('@/lib/auth/security-log')
+      await logSuspiciousActivity(
+        decodedToken.uid,
+        'prompt_injection_attempt',
+        { endpoint: '/api/analytics/copilot', question: question.slice(0, 100) },
+        request
+      )
+      return NextResponse.json(
+        { error: 'Invalid input detected. Please rephrase your question.' },
+        { status: 400 }
+      )
+    }
+
+    // SECURITY: Sanitize user input
+    const sanitizedQuestion = sanitizeUserInput(question)
+
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json(
@@ -114,7 +134,7 @@ export async function POST(request: NextRequest) {
     // Step 1: Determine which agents are relevant to this question
     const agentSelectionPrompt = `You are analyzing a question for CallMap's analytics dashboard.
 
-Question: "${question}"
+Question: "${sanitizedQuestion}"
 
 Available agents:
 - marketing: Growth, acquisition, activation, and retention
@@ -159,7 +179,7 @@ Return only the JSON array, no other text.`
         Cookie: request.headers.get('cookie') || '',
       },
       body: JSON.stringify({
-        message: question,
+        message: sanitizedQuestion,
         agents: relevantAgents,
       }),
     })
@@ -175,7 +195,7 @@ Return only the JSON array, no other text.`
     // Step 3: Combine agent responses into a single cohesive answer
     const combinationPrompt = `You are synthesizing responses from multiple AI agents to answer a user's question.
 
-Question: "${question}"
+Question: "${sanitizedQuestion}"
 
 Agent responses:
 ${agentReports.map((agent: any) => `

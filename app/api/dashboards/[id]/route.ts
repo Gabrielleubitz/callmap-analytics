@@ -15,21 +15,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return errorResponse('Database not initialized', 500)
@@ -60,21 +54,15 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return errorResponse('Database not initialized', 500)
@@ -111,21 +99,15 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!authResult.success || !authResult.decodedToken) {
+      return authErrorResponse(authResult)
     }
 
-    const decodedToken = await verifySessionCookie(sessionCookie)
-
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
-      )
-    }
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return errorResponse('Database not initialized', 500)

@@ -62,6 +62,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { pageName, description, metrics, data } = body
 
+    // SECURITY: Sanitize and redact sensitive data before sending to LLM
+    const { sanitizeUserInput, redactSecrets } = await import('@/lib/security/ai-redaction')
+    const sanitizedPageName = sanitizeUserInput(pageName || '')
+    const sanitizedDescription = description ? sanitizeUserInput(description) : undefined
+    const sanitizedMetrics = metrics ? redactSecrets(JSON.stringify(metrics)) : undefined
+    const sanitizedData = data ? redactSecrets(JSON.stringify(data)) : undefined
+
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json({
@@ -69,25 +76,25 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Build context for AI
-    let contextText = `Page: ${pageName}\n`
-    if (description) {
-      contextText += `Description: ${description}\n`
+    // Build context for AI using sanitized data
+    let contextText = `Page: ${sanitizedPageName}\n`
+    if (sanitizedDescription) {
+      contextText += `Description: ${sanitizedDescription}\n`
     }
-    if (metrics) {
-      contextText += `\nKey Metrics:\n${JSON.stringify(metrics, null, 2)}\n`
+    if (sanitizedMetrics) {
+      contextText += `\nKey Metrics:\n${sanitizedMetrics}\n`
     }
-    if (data) {
+    if (sanitizedData) {
       // Summarize data if it's too large
-      const dataStr = JSON.stringify(data)
-      if (dataStr.length > 2000) {
-        contextText += `\nData Summary: ${Object.keys(data).length} items\n`
+      if (sanitizedData.length > 2000) {
+        const dataObj = data ? JSON.parse(JSON.stringify(data)) : {}
+        contextText += `\nData Summary: ${Object.keys(dataObj).length} items\n`
       } else {
-        contextText += `\nData: ${dataStr}\n`
+        contextText += `\nData: ${sanitizedData}\n`
       }
     }
 
-    const prompt = `You are an AI coach for CallMap's analytics dashboard. A user is looking at the "${pageName}" page.
+    const prompt = `You are an AI coach for CallMap's analytics dashboard. A user is looking at the "${sanitizedPageName}" page.
 
 ${contextText}
 
