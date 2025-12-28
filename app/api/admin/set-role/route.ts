@@ -31,22 +31,19 @@ export async function POST(request: NextRequest) {
 
     const decodedToken = authResult.decodedToken
 
+    // SECURITY: Validate request body
     const body = await request.json()
-    const { uid, role } = body
+    const { setRoleSchema, safeValidateRequestBody } = await import('@/lib/schemas/validation')
+    const validationResult = safeValidateRequestBody(setRoleSchema, body)
 
-    if (!uid || !role) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'UID and role are required' },
+        { error: 'Invalid request', details: validationResult.error.issues },
         { status: 400 }
       )
     }
 
-    if (!['admin', 'superAdmin'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role. Must be "admin" or "superAdmin"' },
-        { status: 400 }
-      )
-    }
+    const { uid, role } = validationResult.data
 
     const auth = getAuth()
 

@@ -585,11 +585,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = (await request.json()) as AgentRunRequest
-    const message = (body.message || '').trim()
-    if (!message) {
-      return NextResponse.json({ error: 'message is required' }, { status: 400 })
+    // SECURITY: Validate request body
+    const body = await request.json()
+    const { aiAgentRequestSchema, safeValidateRequestBody } = await import('@/lib/schemas/validation')
+    const validationResult = safeValidateRequestBody(aiAgentRequestSchema, body)
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validationResult.error.issues },
+        { status: 400 }
+      )
     }
+
+    const validatedBody = validationResult.data
+    const message = validatedBody.message.trim()
 
     // SECURITY: Check for prompt injection attempts
     const { detectPromptInjection } = await import('@/lib/security/ai-redaction')
@@ -609,10 +618,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle Product/Dev agents (single agent mode)
-    if (body.agentType === 'product' || body.agentType === 'dev') {
+    if (validatedBody.agentType === 'product' || validatedBody.agentType === 'dev') {
       const context = await buildContext(request)
       // Pass a placeholder agentId for runAgent, but it will use agentType instead
-      const result = await runAgent('product' as AgentId, body, context)
+      const agentRequest: AgentRunRequest = {
+        message: validatedBody.message,
+        agentType: validatedBody.agentType,
+        tone: validatedBody.tone,
+        history: validatedBody.history,
+      }
+      const result = await runAgent('product' as AgentId, agentRequest, context)
       
       // Analyze response for metadata
       const answerText = result.report?.summary || JSON.stringify(result.report || {})
@@ -625,8 +640,8 @@ export async function POST(request: NextRequest) {
         contextRange: context.range,
         agent: result,
         metadata: {
-          agentType: body.agentType,
-          tone: body.tone || 'normal',
+          agentType: validatedBody.agentType,
+          tone: validatedBody.tone || 'normal',
           isDataQuestion: isData,
           showGeneratePrompt,
           showExport: isData,
@@ -636,8 +651,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle existing multi-agent mode
-    const requestedAgents = (body.agents && body.agents.length
-      ? body.agents
+    const requestedAgents = (validatedBody.agents && validatedBody.agents.length
+      ? validatedBody.agents
       : (Object.keys(AGENTS) as AgentId[])
     ).filter((id): id is AgentId => id in AGENTS)
 
@@ -647,8 +662,14 @@ export async function POST(request: NextRequest) {
 
     const context = await buildContext(request)
 
+    const agentRequest: AgentRunRequest = {
+      message: validatedBody.message,
+      agents: validatedBody.agents,
+      history: validatedBody.history,
+    }
+
     const results = await Promise.all(
-      requestedAgents.map((agentId) => runAgent(agentId, body, context))
+      requestedAgents.map((agentId) => runAgent(agentId, agentRequest, context))
     )
 
     return NextResponse.json({

@@ -68,15 +68,27 @@ export async function PATCH(
       return errorResponse('Database not initialized', 500)
     }
 
+    // SECURITY: Validate request body
     const body = await request.json()
+    const { dashboardUpdateSchema, safeValidateRequestBody } = await import('@/lib/schemas/validation')
+    const validationResult = safeValidateRequestBody(dashboardUpdateSchema, body)
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validationResult.error.issues },
+        { status: 400 }
+      )
+    }
+
+    const validatedData = validationResult.data
     const updateData: any = {
       updated_at: admin.firestore.Timestamp.now(),
     }
 
-    if (body.name !== undefined) updateData.name = body.name
-    if (body.description !== undefined) updateData.description = body.description
-    if (body.widgets !== undefined) updateData.widgets = body.widgets
-    if (body.layout !== undefined) updateData.layout = body.layout
+    if (validatedData.name !== undefined) updateData.name = validatedData.name
+    if (validatedData.description !== undefined) updateData.description = validatedData.description
+    if (validatedData.widgets !== undefined) updateData.widgets = validatedData.widgets
+    if (validatedData.layout !== undefined) updateData.layout = validatedData.layout
 
     await adminDb
       .collection(FIRESTORE_COLLECTIONS.customDashboards)

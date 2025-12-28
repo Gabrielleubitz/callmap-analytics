@@ -62,8 +62,19 @@ export async function POST(request: NextRequest) {
       return errorResponse('Database not initialized', 500)
     }
 
+    // SECURITY: Validate request body
     const body = await request.json()
-    const { name, description, widgets, layout } = body
+    const { dashboardCreateSchema, safeValidateRequestBody } = await import('@/lib/schemas/validation')
+    const validationResult = safeValidateRequestBody(dashboardCreateSchema, body)
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validationResult.error.issues },
+        { status: 400 }
+      )
+    }
+
+    const { name, description, widgets, layout } = validationResult.data
 
     if (!name || !widgets || !Array.isArray(widgets)) {
       return NextResponse.json(

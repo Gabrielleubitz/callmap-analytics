@@ -39,7 +39,7 @@ export const aiAgentRequestSchema = z.object({
   agentType: agentTypeSchema.optional(),
   agents: z.array(agentIdSchema).optional(),
   tone: toneSchema.optional(),
-  history: z.any().optional(), // Complex type, validate separately if needed
+  history: z.unknown().optional(), // Complex type, validate separately if needed
 }).strict()
 
 export const generatePromptRequestSchema = z.object({
@@ -47,7 +47,7 @@ export const generatePromptRequestSchema = z.object({
   question: nonEmptyStringSchema.max(2000),
   answer: nonEmptyStringSchema.max(10000),
   tags: z.array(z.string()).optional(),
-  context: z.record(z.any()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
 }).strict()
 
 // Dashboard schemas
@@ -120,8 +120,8 @@ export const supportErrorUpdateSchema = z.object({
 export const explainPageSchema = z.object({
   pageName: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
-  metrics: z.record(z.any()).optional(),
-  data: z.any().optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+  data: z.unknown().optional(),
 }).strict()
 
 // Insights schema

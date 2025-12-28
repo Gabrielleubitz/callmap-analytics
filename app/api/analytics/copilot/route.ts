@@ -96,12 +96,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // SECURITY: Validate request body
     const body = await request.json()
-    const question = (body.message || '').trim()
+    const { copilotRequestSchema, safeValidateRequestBody } = await import('@/lib/schemas/validation')
+    const validationResult = safeValidateRequestBody(copilotRequestSchema, body)
 
-    if (!question) {
-      return NextResponse.json({ error: 'message is required' }, { status: 400 })
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request', details: validationResult.error.issues },
+        { status: 400 }
+      )
     }
+
+    const question = validationResult.data.message.trim()
 
     // SECURITY: Check for prompt injection attempts
     const { detectPromptInjection, sanitizeUserInput } = await import('@/lib/security/ai-redaction')
