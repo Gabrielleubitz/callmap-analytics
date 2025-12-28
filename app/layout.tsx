@@ -43,8 +43,16 @@ export default function RootLayout({
           - Soft radial gradients to make the dashboard feel more premium
           - Kept light for readability of existing cards and components
         */}
-        <main className="min-h-screen bg-gray-50 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.10),_transparent_55%)]">
-          {children}
+        <main className="min-h-screen relative overflow-hidden">
+          {/* Liquid glass background with animated gradients */}
+          <div className="fixed inset-0 -z-10">
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 via-blue-50/30 to-indigo-50/50"></div>
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,rgba(6,182,212,0.15),transparent_50%),radial-gradient(circle_at_80%_70%,rgba(59,130,246,0.15),transparent_50%),radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.1),transparent_70%)]"></div>
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-40"></div>
+          </div>
+          <div className="relative z-0">
+            {children}
+          </div>
         </main>
       </body>
     </html>

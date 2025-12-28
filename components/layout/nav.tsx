@@ -8,28 +8,22 @@ import { ErrorNotificationBell } from "@/components/support/error-notification-b
 
 const primaryNavItems = [
   { href: "/", label: "Overview" },
-  { href: "/monitoring/live", label: "Live" },
+  { href: "/monitoring", label: "Monitoring" },
   { href: "/teams", label: "Teams" },
   { href: "/users", label: "Users" },
-  { href: "/usage", label: "Usage & Tokens" },
-  { href: "/billing", label: "Billing" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/ops", label: "Ops" },
-  { href: "/admin/ai-agents", label: "AI Agents" },
+  { href: "/ai-assistant", label: "AI Assistant" },
   { href: "/support/errors", label: "Support" },
 ]
 
 const secondaryNavItems = [
   { href: "/insights", label: "Insights" },
   { href: "/users/health", label: "User Health" },
-  { href: "/predictions/churn", label: "Churn Prediction" },
-  { href: "/predictions/revenue", label: "Revenue Forecast" },
-  { href: "/predictions/usage", label: "Usage Forecast" },
-  { href: "/revenue/optimization", label: "Revenue Optimization" },
+  { href: "/predictions", label: "Predictions" },
   { href: "/dashboards", label: "Dashboards" },
-  { href: "/analytics/chat", label: "AI Copilot" },
   { href: "/reports", label: "Reports" },
   { href: "/benchmarks", label: "Benchmarks" },
-  { href: "/monitoring/alerts", label: "Alerts" },
   { href: "/explorer", label: "Data Explorer" },
   { href: "/journeys", label: "Journeys" },
   { href: "/diagnostics", label: "Diagnostics" },
@@ -40,7 +34,7 @@ export function Nav() {
   const pathname = usePathname()
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-lg">
+    <nav className="sticky top-0 z-40 border-b border-white/30 bg-gradient-to-r from-white/90 via-white/85 to-white/90 backdrop-blur-2xl shadow-lg">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Brand */}
@@ -65,21 +59,25 @@ export function Nav() {
 
             {/* Navigation links */}
             <div className="hidden md:flex items-center">
-              <div className="flex items-center gap-1 rounded-full bg-slate-100/70 px-1 py-1 shadow-soft">
+              <div className="flex items-center gap-1 rounded-full bg-white/40 backdrop-blur-xl border border-white/30 px-1 py-1 shadow-lg">
                 {primaryNavItems.map((item) => {
                   const isActive =
                     pathname === item.href ||
-                    (item.href !== "/" && pathname?.startsWith(item.href))
+                    (item.href !== "/" && pathname?.startsWith(item.href)) ||
+                    (item.href === "/monitoring" && (pathname?.startsWith("/monitoring/live") || pathname?.startsWith("/monitoring/alerts"))) ||
+                    (item.href === "/predictions" && pathname?.startsWith("/predictions/")) ||
+                    (item.href === "/analytics" && (pathname?.startsWith("/usage") || pathname?.startsWith("/billing") || pathname?.startsWith("/revenue/optimization"))) ||
+                    (item.href === "/ai-assistant" && (pathname?.startsWith("/admin/ai-agents") || pathname?.startsWith("/analytics/chat")))
 
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-smooth",
+                        "px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-all duration-300",
                         isActive
-                          ? "bg-white text-slate-900 shadow-soft"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                          ? "bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white shadow-lg shadow-cyan-500/25 backdrop-blur-md"
+                          : "text-slate-700 hover:text-slate-900 hover:bg-white/60 backdrop-blur-sm"
                       )}
                     >
                       {item.label}
@@ -105,7 +103,7 @@ export function Nav() {
                     More
                     <span className="text-[10px]">▾</span>
                   </button>
-                  <div className="invisible absolute left-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 text-xs shadow-lg opacity-0 transition-all duration-150 group-hover:visible group-hover:opacity-100">
+                  <div className="invisible absolute left-0 top-full z-50 mt-2 w-48 rounded-2xl border border-white/30 bg-gradient-to-br from-white/95 via-white/90 to-white/95 backdrop-blur-2xl py-2 text-xs shadow-2xl opacity-0 transition-all duration-300 group-hover:visible group-hover:opacity-100">
                     {secondaryNavItems.map((item) => {
                       const isActive =
                         pathname === item.href ||
@@ -116,10 +114,10 @@ export function Nav() {
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            "flex w-full px-3 py-1.5 text-left whitespace-nowrap transition-colors",
+                            "flex w-full px-4 py-2 text-left whitespace-nowrap transition-all duration-200 rounded-lg mx-1",
                             isActive
-                              ? "bg-slate-100 text-slate-900"
-                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                              ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-slate-900 border border-cyan-400/30"
+                              : "text-slate-700 hover:bg-white/60 hover:text-slate-900"
                           )}
                         >
                           {item.label}
@@ -155,10 +153,10 @@ export function Nav() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-smooth",
+                    "px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-all duration-300",
                     isActive
-                      ? "bg-white text-slate-900 shadow-soft"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                      ? "bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white shadow-lg shadow-cyan-500/25 backdrop-blur-md"
+                      : "text-slate-700 hover:text-slate-900 hover:bg-white/60 backdrop-blur-sm"
                   )}
                 >
                   {item.label}
