@@ -45,28 +45,23 @@ export async function POST(
       }
     }
     
-    // SECURITY: Verify session and check for admin role
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('callmap_session')?.value
+    // SECURITY: Use centralized RBAC helper
+    const { requireAdmin, authErrorResponse } = await import('@/lib/auth/permissions')
+    const authResult = await requireAdmin(request)
 
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    let decodedToken
-    try {
-      decodedToken = await verifySessionCookie(sessionCookie)
-    } catch (error: any) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
-    }
-
-    // Check if user is admin or superAdmin
-    if (decodedToken.role !== 'superAdmin' && decodedToken.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
-        { status: 403 }
+    if (!authResult.success || !authResult.decodedToken) {
+      // SECURITY: Log permission denial
+      const { logPermissionDenied } = await import('@/lib/auth/security-log')
+      await logPermissionDenied(
+        authResult.decodedToken?.uid || null,
+        'adjust_wallet',
+        `user:${params.userId}`,
+        request
       )
+      return authErrorResponse(authResult)
     }
+
+    const decodedToken = authResult.decodedToken
 
     if (!adminDb) {
       return NextResponse.json(errorResponse('Firebase Admin not initialized'), { status: 500 })
@@ -175,6 +170,18 @@ export async function POST(
       timestamp: result.timestamp,
     }).catch((error) => {
       console.error('[admin/wallet/adjust] Error logging analytics:', error)
+    })
+
+    // SECURITY: Log wallet adjustment to security events
+    const { logWalletAdjustment } = await import('@/lib/auth/security-log')
+    await logWalletAdjustment(
+      userId,
+      amount,
+      note || 'Manual adjustment by admin',
+      decodedToken.uid,
+      request
+    ).catch((error) => {
+      console.error('[admin/wallet/adjust] Error logging security event:', error)
     })
 
     return NextResponse.json({
