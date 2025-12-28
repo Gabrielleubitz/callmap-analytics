@@ -11,7 +11,7 @@ const outfit = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: "CallMap Admin",
+  title: "CallMap Analytics",
   description: "Internal admin dashboard for CallMap",
   icons: {
     icon: [
