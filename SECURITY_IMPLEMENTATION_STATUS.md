@@ -29,6 +29,16 @@ This document tracks the implementation progress of security hardening improveme
 **Applied to:**
 - ✅ `/api/admin/ai-agents` - AI Agents route
 - ✅ `/api/admin/wallet/[userId]/adjust` - Wallet adjustment route
+- ✅ `/api/admin/set-role` - Set admin role route
+- ✅ `/api/admin/users` - List users route
+- ✅ `/api/admin/ai-agents/generate-prompt` - Generate prompt route
+- ✅ `/api/analytics/copilot` - AI Copilot route
+- ✅ `/api/ai/explain-page` - Explain page route
+- ✅ `/api/insights/generate` - Insights generation route
+- ✅ `/api/monitoring/live` - Live monitoring route
+- ✅ `/api/support/errors/list` - Error list route
+- ✅ `/api/reports/generate` - Report generation route
+- ✅ `/api/dashboards` - Dashboards route (GET and POST)
 
 **Remaining:**
 - ⏳ Apply to all `/api/admin/*` routes
@@ -47,6 +57,9 @@ This document tracks the implementation progress of security hardening improveme
 **Completed:**
 - ✅ Login endpoint has rate limiting (3 attempts per 15 minutes)
 - ✅ AI Agents route has rate limiting (10 requests per minute per user)
+- ✅ AI Copilot route has rate limiting (15 requests per minute per user)
+- ✅ Explain page route has rate limiting (20 requests per minute per user)
+- ✅ Insights generation route has rate limiting (5 requests per minute per user)
 - ✅ Rate limit exceeded events are logged
 
 **Remaining:**
@@ -204,9 +217,10 @@ This document tracks the implementation progress of security hardening improveme
 - **In Progress:** 2 (RBAC, Rate Limiting)
 - **Pending:** 7
 
-- **Routes Updated:** 2 of ~100+ routes
+- **Routes Updated:** 13 of ~100+ routes
 - **Security Features Added:** 3 major features
 - **Security Events Logged:** 4 event types
+- **Rate Limits Added:** 5 endpoints
 
 ---
 
