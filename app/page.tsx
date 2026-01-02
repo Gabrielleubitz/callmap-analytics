@@ -22,7 +22,7 @@ import { ErrorState } from "@/components/ui/error-state"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatNumber } from "@/lib/utils"
-import { DateRange, getOverviewMetrics, getDailyActiveUsers, getDailySessions, getDailyTokensByModel, getTokensByPlan, getTopTeamsByTokens, getTopTeamsByCost, getRecentlyCreatedTeams, getRecentlyFailedAIJobs, getMindmapGenerationTime, getMindmapEditCount, getFileConversionRate, getUserRetention, getMindmapFunnel, getExportRate, getCollaborationActivity, getTokenBurnByFeature, getMapEconomics, getBehaviorCohorts, getActionItemsAnalytics, getCallLogsAnalytics, getContactsAnalytics, getMindmapContentAnalytics, getWorkspaceActivityAnalytics } from "@/lib/db"
+import { DateRange, getOverviewMetrics, getDailyActiveUsers, getDailySessions, getDailyTokensByModel, getTokensByPlan, getTopTeamsByTokens, getTopTeamsByCost, getRecentlyCreatedTeams, getRecentlyFailedAIJobs, getMindmapGenerationTime, getMindmapEditCount, getFileConversionRate, getUserRetention, getMindmapFunnel, getExportRate, getCollaborationActivity, getTokenBurnByFeature, getMapEconomics, getBehaviorCohorts, getActionItemsAnalytics, getCallLogsAnalytics, getContactsAnalytics, getMindmapContentAnalytics, getWorkspaceActivityAnalytics, getProgressCallsAnalytics, getDiscussionsAnalytics } from "@/lib/db"
 import { useApiData } from "@/lib/hooks/useApiData"
 import { HeroMetricCard } from "@/components/metrics/hero-metric-card"
 import { MetricGroupCard } from "@/components/metrics/metric-group-card"
@@ -82,6 +82,8 @@ export default function OverviewPage() {
   const contactsAnalytics = useApiData(() => getContactsAnalytics(dateRange), [dateRange])
   const mindmapContentAnalytics = useApiData(() => getMindmapContentAnalytics(dateRange), [dateRange])
   const workspaceActivityAnalytics = useApiData(() => getWorkspaceActivityAnalytics(dateRange), [dateRange])
+  const progressCallsAnalytics = useApiData(() => getProgressCallsAnalytics(dateRange), [dateRange])
+  const discussionsAnalytics = useApiData(() => getDiscussionsAnalytics(dateRange), [dateRange])
 
   // Calculate today's metrics and deltas
   const todayMetrics = useMemo(() => {
@@ -1767,6 +1769,131 @@ export default function OverviewPage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Progress Calls Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Progress Calls</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Track progress call completion rates, batches, and goal status tracking.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {progressCallsAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : progressCallsAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load progress calls analytics"
+                  description={progressCallsAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !progressCallsAnalytics.data ? (
+                <EmptyState title="No data" description="No progress calls analytics available." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Calls</span>
+                    <span className="font-semibold">{formatNumber(progressCallsAnalytics.data.totalCalls)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Completed</span>
+                    <span className="font-semibold">{formatNumber(progressCallsAnalytics.data.completedCalls)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Completion Rate</span>
+                    <Badge variant={progressCallsAnalytics.data.completionRate >= 70 ? "default" : "secondary"}>
+                      {progressCallsAnalytics.data.completionRate.toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Pending</span>
+                    <span className="font-semibold">{formatNumber(progressCallsAnalytics.data.pendingCalls)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Batches</span>
+                    <span className="font-semibold">{formatNumber(progressCallsAnalytics.data.totalBatches)}</span>
+                  </div>
+                  {progressCallsAnalytics.data.averageQuestionsAnswered > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Avg Questions/Call</span>
+                      <span className="font-semibold">{progressCallsAnalytics.data.averageQuestionsAnswered.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {Object.keys(progressCallsAnalytics.data.goalStatusDistribution || {}).length > 0 && (
+                    <div className="pt-2 border-t">
+                      <div className="text-xs text-gray-500 mb-2">Goal Status:</div>
+                      {Object.entries(progressCallsAnalytics.data.goalStatusDistribution).map(([status, count]) => (
+                        <div key={status} className="flex justify-between text-sm">
+                          <span className="capitalize">{status.replace(/_/g, ' ')}</span>
+                          <span>{formatNumber(count as number)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Discussions Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Discussions</CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Track discussion creation, participation, closure rates, and message activity.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {discussionsAnalytics.isLoading ? (
+                <LoadingState variant="card" />
+              ) : discussionsAnalytics.isError ? (
+                <ErrorState
+                  title="Failed to load discussions analytics"
+                  description={discussionsAnalytics.error?.message}
+                  variant="banner"
+                />
+              ) : !discussionsAnalytics.data ? (
+                <EmptyState title="No data" description="No discussions analytics available." />
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Discussions</span>
+                    <span className="font-semibold">{formatNumber(discussionsAnalytics.data.totalDiscussions)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Active</span>
+                    <span className="font-semibold">{formatNumber(discussionsAnalytics.data.activeDiscussions)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Closed</span>
+                    <span className="font-semibold">{formatNumber(discussionsAnalytics.data.closedDiscussions)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Messages</span>
+                    <span className="font-semibold">{formatNumber(discussionsAnalytics.data.totalMessages)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Participation Rate</span>
+                    <Badge variant={discussionsAnalytics.data.participationRate >= 50 ? "default" : "secondary"}>
+                      {discussionsAnalytics.data.participationRate.toFixed(1)}%
+                    </Badge>
+                  </div>
+                  {discussionsAnalytics.data.averageMessagesPerDiscussion > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Avg Messages/Discussion</span>
+                      <span className="font-semibold">{discussionsAnalytics.data.averageMessagesPerDiscussion.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {discussionsAnalytics.data.averageParticipants > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Avg Participants</span>
+                      <span className="font-semibold">{discussionsAnalytics.data.averageParticipants.toFixed(1)}</span>
                     </div>
                   )}
                 </div>

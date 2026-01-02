@@ -1039,6 +1039,141 @@ export async function getMindmapContentAnalytics(range: DateRange): Promise<{
   return extractMetricData(result)
 }
 
+/**
+ * Get progress calls analytics
+ */
+export async function getProgressCallsAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/progress-calls', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalCalls: 0,
+    completedCalls: 0,
+    pendingCalls: 0,
+    declinedCalls: 0,
+    completionRate: 0,
+    averageQuestionsAnswered: 0,
+    averageDuration: 0,
+    totalBatches: 0,
+    completedBatches: 0,
+    batchCompletionRate: 0,
+    goalStatusDistribution: {},
+    followUpCallsCreated: 0,
+    dailyCalls: [],
+    dailyCompleted: [],
+  }
+}
+
+/**
+ * Get discussions analytics
+ */
+export async function getDiscussionsAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/discussions', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalDiscussions: 0,
+    activeDiscussions: 0,
+    closedDiscussions: 0,
+    expiredDiscussions: 0,
+    totalMessages: 0,
+    averageMessagesPerDiscussion: 0,
+    averageParticipants: 0,
+    participationRate: 0,
+    closureRate: 0,
+    averageTimeToClose: 0,
+    dailyDiscussions: [],
+    dailyMessages: [],
+  }
+}
+
+/**
+ * Get user lifecycle analytics
+ */
+export async function getUserLifecycleAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/user-lifecycle', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalUsers: 0,
+    newSignups: 0,
+    activatedUsers: 0,
+    activationRate: 0,
+    dau: 0,
+    wau: 0,
+    mau: 0,
+    churn30d: 0,
+    churn60d: 0,
+    churn90d: 0,
+    planDistribution: {},
+    onboardedUsers: 0,
+    onboardingCompletionRate: 0,
+    accountAgeDistribution: {},
+  }
+}
+
+/**
+ * Get integration analytics
+ */
+export async function getIntegrationAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/integrations', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    totalIntegrations: 0,
+    activeIntegrations: 0,
+    integrationsByProvider: {},
+    activeIntegrationsByProvider: {},
+    totalErrors: 0,
+    errorsByProvider: {},
+    errorRate: 0,
+    syncSuccessRate: 0,
+    webhookEventsReceived: 0,
+    webhookEventsProcessed: 0,
+    webhookEventsFailed: 0,
+  }
+}
+
+/**
+ * Get security analytics
+ */
+export async function getSecurityAnalytics(range: DateRange): Promise<any> {
+  const result = await apiRequest<{ data: any }>('/api/analytics/security', {
+    method: 'POST',
+    body: JSON.stringify({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    }),
+  })
+  return extractMetricData(result) || {
+    failedLoginAttempts: 0,
+    securityIncidents: 0,
+    incidentsBySeverity: {},
+    incidentsByType: {},
+    auditLogCount: 0,
+    auditLogsByAction: {},
+    dataDeletionRequests: 0,
+    deletionRequestsByStatus: {},
+    suspiciousActivityCount: 0,
+  }
+}
+
 export async function getWorkspaceActivityAnalytics(range: DateRange): Promise<{
   activeWorkspaces: number
   workspaces: Array<{

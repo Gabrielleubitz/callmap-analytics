@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { EmptyState } from "@/components/ui/empty-state"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, formatNumber } from "@/lib/utils"
 import {
   getBillingMetrics,
   getRevenueOverTime,
@@ -29,6 +29,7 @@ import {
   getInvoices,
   getPayments,
   getCredits,
+  getWalletMetrics,
   DateRange,
 } from "@/lib/db"
 import { useApiData } from "@/lib/hooks/useApiData"
@@ -63,6 +64,7 @@ export default function BillingPage() {
   const invoices = useApiData(() => getInvoices({ page: 1, pageSize: 50 }), [])
   const payments = useApiData(() => getPayments({ page: 1, pageSize: 50 }), [])
   const credits = useApiData(() => getCredits({ page: 1, pageSize: 50 }), [])
+  const walletMetrics = useApiData(() => getWalletMetrics(dateRange, 1000), [dateRange])
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -165,6 +167,37 @@ export default function BillingPage() {
               },
             ]}
           />
+
+          {/* Top-Up Purchases Section */}
+          {walletMetrics.data && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Token Pack Purchases (Top-Ups)</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Track token pack purchases and top-up revenue. These are one-time purchases users make to add tokens to their wallet.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <MetricGroupCard
+                  title=""
+                  metrics={[
+                    {
+                      label: "Total Credits",
+                      value: formatCurrency(walletMetrics.data.totals.credits * 0.01 || 0), // Estimate: $0.01 per token
+                    },
+                    {
+                      label: "Active Wallets",
+                      value: formatNumber(walletMetrics.data.activeWallets),
+                    },
+                    {
+                      label: "Low Balance Users",
+                      value: formatNumber(walletMetrics.data.lowBalanceCount),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

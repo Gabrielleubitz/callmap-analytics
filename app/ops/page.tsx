@@ -27,12 +27,15 @@ import {
   getAIJobStats,
   getWebhookEndpoints,
   getWebhookLogs,
+  getIntegrationAnalytics,
+  getSecurityAnalytics,
   DateRange,
 } from "@/lib/db"
 import { useApiData } from "@/lib/hooks/useApiData"
 import { HeroMetricCard } from "@/components/metrics/hero-metric-card"
+import { MetricGroupCard } from "@/components/metrics/metric-group-card"
 import Link from "next/link"
-import { AlertTriangle, Clock, Activity, CheckCircle, XCircle, Filter, ChevronDown, ChevronUp, Zap, FileText, Edit, Download } from "lucide-react"
+import { AlertTriangle, Clock, Activity, CheckCircle, XCircle, Filter, ChevronDown, ChevronUp, Zap, FileText, Edit, Download, AlertCircle } from "lucide-react"
 
 // Job type icons mapping
 const JOB_TYPE_ICONS: Record<string, any> = {
@@ -63,6 +66,8 @@ export default function OpsPage() {
   const aiJobStats = useApiData(() => getAIJobStats(dateRange), [dateRange])
   const webhookEndpoints = useApiData(() => getWebhookEndpoints({ page: 1, pageSize: 100 }), [])
   const webhookLogs = useApiData(() => getWebhookLogs({ page: 1, pageSize: 100 }), [])
+  const integrationAnalytics = useApiData(() => getIntegrationAnalytics(dateRange), [dateRange])
+  const securityAnalytics = useApiData(() => getSecurityAnalytics(dateRange), [dateRange])
 
   // Extract arrays from paginated responses
   const aiJobsArray = aiJobs.data?.data || []
@@ -132,6 +137,8 @@ export default function OpsPage() {
         <TabsList className="mb-6">
           <TabsTrigger value="ai-jobs">AI Jobs</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="errors">System Errors</TabsTrigger>
         </TabsList>
 
@@ -586,6 +593,225 @@ export default function OpsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Integrations Tab */}
+        <TabsContent value="integrations">
+          {/* Hero Metrics */}
+          {integrationAnalytics.isLoading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <LoadingState key={i} variant="card" />
+              ))}
+            </div>
+          ) : integrationAnalytics.isError ? (
+            <ErrorState
+              title="Failed to load integration analytics"
+              description={integrationAnalytics.error?.message}
+              onRetry={integrationAnalytics.refetch}
+            />
+          ) : integrationAnalytics.data ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
+                <HeroMetricCard
+                  title="Total Integrations"
+                  value={formatNumber(integrationAnalytics.data.totalIntegrations)}
+                  icon={<Activity className="h-5 w-5" />}
+                />
+                <HeroMetricCard
+                  title="Active Integrations"
+                  value={formatNumber(integrationAnalytics.data.activeIntegrations)}
+                  icon={<CheckCircle className="h-5 w-5 text-green-600" />}
+                />
+                <HeroMetricCard
+                  title="Integration Errors"
+                  value={formatNumber(integrationAnalytics.data.totalErrors)}
+                  icon={<XCircle className="h-5 w-5 text-red-600" />}
+                />
+                <HeroMetricCard
+                  title="Error Rate"
+                  value={`${integrationAnalytics.data.errorRate.toFixed(1)}%`}
+                  icon={<AlertTriangle className="h-5 w-5" />}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Integrations by Provider</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {Object.keys(integrationAnalytics.data.integrationsByProvider || {}).length === 0 ? (
+                      <EmptyState title="No integrations" description="No integrations found." />
+                    ) : (
+                      <div className="space-y-2">
+                        {Object.entries(integrationAnalytics.data.integrationsByProvider).map(([provider, count]) => (
+                          <div key={provider} className="flex items-center justify-between p-2 rounded-lg border">
+                            <span className="font-medium capitalize">{provider.replace(/_/g, ' ')}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{formatNumber(count as number)}</Badge>
+                              {integrationAnalytics.data.activeIntegrationsByProvider[provider] && (
+                                <Badge variant="default" className="text-xs">
+                  Active: {formatNumber(integrationAnalytics.data.activeIntegrationsByProvider[provider])}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Integration Health</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <MetricGroupCard
+                      title=""
+                      metrics={[
+                        { label: "Sync Success Rate", value: `${integrationAnalytics.data.syncSuccessRate.toFixed(1)}%` },
+                        { label: "Webhook Events Received", value: formatNumber(integrationAnalytics.data.webhookEventsReceived) },
+                        { label: "Webhook Events Processed", value: formatNumber(integrationAnalytics.data.webhookEventsProcessed) },
+                        { label: "Webhook Events Failed", value: formatNumber(integrationAnalytics.data.webhookEventsFailed) },
+                      ]}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {Object.keys(integrationAnalytics.data.errorsByProvider || {}).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Errors by Provider</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(integrationAnalytics.data.errorsByProvider)
+                        .sort(([, a], [, b]) => (b as number) - (a as number))
+                        .map(([provider, count]) => (
+                          <div key={provider} className="flex items-center justify-between p-2 rounded-lg border border-red-200 bg-red-50">
+                            <span className="font-medium capitalize text-red-900">{provider.replace(/_/g, ' ')}</span>
+                            <Badge variant="destructive">{formatNumber(count as number)}</Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : null}
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security">
+          {/* Hero Metrics */}
+          {securityAnalytics.isLoading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <LoadingState key={i} variant="card" />
+              ))}
+            </div>
+          ) : securityAnalytics.isError ? (
+            <ErrorState
+              title="Failed to load security analytics"
+              description={securityAnalytics.error?.message}
+              onRetry={securityAnalytics.refetch}
+            />
+          ) : securityAnalytics.data ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
+                <HeroMetricCard
+                  title="Failed Logins"
+                  value={formatNumber(securityAnalytics.data.failedLoginAttempts)}
+                  icon={<XCircle className="h-5 w-5 text-red-600" />}
+                />
+                <HeroMetricCard
+                  title="Security Incidents"
+                  value={formatNumber(securityAnalytics.data.securityIncidents)}
+                  icon={<AlertTriangle className="h-5 w-5 text-orange-600" />}
+                />
+                <HeroMetricCard
+                  title="Audit Logs"
+                  value={formatNumber(securityAnalytics.data.auditLogCount)}
+                  icon={<Activity className="h-5 w-5" />}
+                />
+                <HeroMetricCard
+                  title="Suspicious Activity"
+                  value={formatNumber(securityAnalytics.data.suspiciousActivityCount)}
+                  icon={<AlertCircle className="h-5 w-5 text-red-600" />}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Incidents</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {securityAnalytics.data.securityIncidents === 0 ? (
+                      <EmptyState title="No incidents" description="No security incidents in this period." />
+                    ) : (
+                      <div className="space-y-4">
+                        {Object.keys(securityAnalytics.data.incidentsBySeverity || {}).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-gray-700 mb-2">By Severity:</div>
+                            {Object.entries(securityAnalytics.data.incidentsBySeverity).map(([severity, count]) => (
+                              <div key={severity} className="flex items-center justify-between p-2 rounded-lg border mb-2">
+                                <span className="font-medium capitalize">{severity}</span>
+                                <Badge variant={severity === 'P0' || severity === 'P1' ? 'destructive' : 'secondary'}>
+                                  {formatNumber(count as number)}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {Object.keys(securityAnalytics.data.incidentsByType || {}).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-gray-700 mb-2">By Type:</div>
+                            {Object.entries(securityAnalytics.data.incidentsByType).map(([type, count]) => (
+                              <div key={type} className="flex items-center justify-between p-2 rounded-lg border mb-2">
+                                <span className="font-medium capitalize">{type.replace(/_/g, ' ')}</span>
+                                <Badge variant="outline">{formatNumber(count as number)}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Audit Logs & Compliance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <MetricGroupCard
+                      title=""
+                      metrics={[
+                        { label: "Total Audit Logs", value: formatNumber(securityAnalytics.data.auditLogCount) },
+                        { label: "Data Deletion Requests", value: formatNumber(securityAnalytics.data.dataDeletionRequests) },
+                        { label: "Suspicious Activity", value: formatNumber(securityAnalytics.data.suspiciousActivityCount) },
+                      ]}
+                    />
+                    {Object.keys(securityAnalytics.data.deletionRequestsByStatus || {}).length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Deletion Requests by Status:</div>
+                        {Object.entries(securityAnalytics.data.deletionRequestsByStatus).map(([status, count]) => (
+                          <div key={status} className="flex items-center justify-between text-sm mb-1">
+                            <span className="capitalize">{status}</span>
+                            <Badge variant="outline">{formatNumber(count as number)}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : null}
         </TabsContent>
 
         {/* System Errors Tab */}

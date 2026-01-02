@@ -10,16 +10,24 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { startOfDay, endOfDay, subDays } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { EmptyState } from "@/components/ui/empty-state"
-import { getUsers, UserRole, UserStatus, UsersParams } from "@/lib/db"
+import { Badge } from "@/components/ui/badge"
+import { DateRangePicker } from "@/components/date-range-picker"
+import { getUsers, UserRole, UserStatus, UsersParams, getUserLifecycleAnalytics, DateRange } from "@/lib/db"
 import { UserListCard } from "@/components/users/user-list-card"
 import { FilterChips, FilterChip } from "@/components/filters/filter-chips"
 import { usePaginatedApi } from "@/lib/hooks/usePaginatedApi"
+import { useApiData } from "@/lib/hooks/useApiData"
+import { HeroMetricCard } from "@/components/metrics/hero-metric-card"
+import { MetricGroupCard } from "@/components/metrics/metric-group-card"
+import { formatNumber } from "@/lib/utils"
+import { Users, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
 
 export default function UsersPage() {
   const [search, setSearch] = useState("")
@@ -29,6 +37,13 @@ export default function UsersPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [adminUsers, setAdminUsers] = useState<Map<string, { isAdmin: boolean; role: string | null }>>(new Map())
   const [loadingAdminStatus, setLoadingAdminStatus] = useState(true)
+  const [dateRange, setDateRange] = useState<DateRange>({
+    start: startOfDay(subDays(new Date(), 30)),
+    end: endOfDay(new Date()),
+  })
+
+  // Fetch user lifecycle metrics
+  const lifecycleMetrics = useApiData(() => getUserLifecycleAnalytics(dateRange), [dateRange])
 
   // Build filters object
   const filters: Partial<UsersParams> = useMemo(() => {
@@ -157,13 +172,109 @@ export default function UsersPage() {
     <div className="container mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">User Management</h1>
-        <p className="text-gray-600 text-sm max-w-3xl">
-          View and manage all users in your platform. Search by name or email, filter by role (Owner, Admin, Member) or status (Active, Invited, Disabled). 
-          {isSuperAdmin && " As a super admin, you can grant or revoke analytics dashboard access by expanding any user card. "}
-          Click on any user card to see detailed information including their activity, token balance, and session history.
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">User Management</h1>
+            <p className="text-gray-600 text-sm max-w-3xl">
+              View and manage all users in your platform. Search by name or email, filter by role (Owner, Admin, Member) or status (Active, Invited, Disabled). 
+              {isSuperAdmin && " As a super admin, you can grant or revoke analytics dashboard access by expanding any user card. "}
+              Click on any user card to see detailed information including their activity, token balance, and session history.
+            </p>
+          </div>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+        </div>
       </div>
+
+      {/* User Lifecycle Metrics */}
+      {lifecycleMetrics.isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <LoadingState key={i} variant="card" />
+          ))}
+        </div>
+      ) : lifecycleMetrics.isError ? (
+        <ErrorState
+          title="Failed to load lifecycle metrics"
+          description={lifecycleMetrics.error?.message}
+          onRetry={lifecycleMetrics.refetch}
+        />
+      ) : lifecycleMetrics.data ? (
+        <div className="mb-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <HeroMetricCard
+              title="Total Users"
+              value={formatNumber(lifecycleMetrics.data.totalUsers)}
+              icon={<Users className="h-5 w-5" />}
+            />
+            <HeroMetricCard
+              title="New Signups"
+              value={formatNumber(lifecycleMetrics.data.newSignups)}
+              icon={<TrendingUp className="h-5 w-5" />}
+            />
+            <HeroMetricCard
+              title="Activation Rate"
+              value={`${lifecycleMetrics.data.activationRate.toFixed(1)}%`}
+              icon={<CheckCircle className="h-5 w-5" />}
+            />
+            <HeroMetricCard
+              title="Onboarding Rate"
+              value={`${lifecycleMetrics.data.onboardingCompletionRate.toFixed(1)}%`}
+              icon={<CheckCircle className="h-5 w-5" />}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MetricGroupCard
+                  title=""
+                  metrics={[
+                    { label: "Daily Active Users (DAU)", value: formatNumber(lifecycleMetrics.data.dau) },
+                    { label: "Weekly Active Users (WAU)", value: formatNumber(lifecycleMetrics.data.wau) },
+                    { label: "Monthly Active Users (MAU)", value: formatNumber(lifecycleMetrics.data.mau) },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Churn Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MetricGroupCard
+                  title=""
+                  metrics={[
+                    { label: "30-Day Churn", value: formatNumber(lifecycleMetrics.data.churn30d) },
+                    { label: "60-Day Churn", value: formatNumber(lifecycleMetrics.data.churn60d) },
+                    { label: "90-Day Churn", value: formatNumber(lifecycleMetrics.data.churn90d) },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {Object.keys(lifecycleMetrics.data.planDistribution || {}).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Plan Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(lifecycleMetrics.data.planDistribution).map(([plan, count]) => (
+                    <Badge key={plan} variant="outline" className="text-sm">
+                      {plan.charAt(0).toUpperCase() + plan.slice(1)}: {formatNumber(count as number)}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      ) : null}
 
       {/* Filter Bar */}
       <Card className="mb-6">

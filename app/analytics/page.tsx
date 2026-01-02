@@ -26,6 +26,8 @@ import {
   getRevenueOverTime,
   getRevenueByPlan,
   getChurnByMonth,
+  getProgressCallsAnalytics,
+  getDiscussionsAnalytics,
   DateRange,
 } from "@/lib/db"
 import { useApiData } from "@/lib/hooks/useApiData"
